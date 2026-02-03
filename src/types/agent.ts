@@ -29,10 +29,14 @@ export interface Workspace {
   worktrees: Worktree[];
 }
 
+export interface UsageLimit {
+  used: number;
+  limit: number;
+  resetTime: Date;
+}
+
 export interface UsageStats {
-  inputTokens: number;
-  outputTokens: number;
-  cacheReadTokens: number;
-  cacheWriteTokens: number;
-  totalCost: number;
+  daily: UsageLimit;
+  weekly: UsageLimit;
+  sonnetOnly: UsageLimit;
 }

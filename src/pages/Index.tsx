@@ -13,11 +13,21 @@ import { Plus, FolderOpen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
 
 const mockUsage: UsageStats = {
-  inputTokens: 125430,
-  outputTokens: 48920,
-  cacheReadTokens: 892100,
-  cacheWriteTokens: 12340,
-  totalCost: 2.4567,
+  daily: {
+    used: 45000,
+    limit: 100000,
+    resetTime: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours from now
+  },
+  weekly: {
+    used: 320000,
+    limit: 500000,
+    resetTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+  },
+  sonnetOnly: {
+    used: 75000,
+    limit: 150000,
+    resetTime: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours from now
+  },
 };
 
 const Index = () => {
