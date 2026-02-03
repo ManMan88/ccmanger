@@ -9,6 +9,7 @@ import {
   ChevronDown,
   MoreHorizontal,
 } from 'lucide-react';
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
 import {
   DropdownMenu,
@@ -175,33 +176,36 @@ export function WorktreeRow({
               </p>
             </div>
           ) : (
-            <div className="flex gap-3 overflow-x-auto pb-2 scrollbar-thin">
-              {worktree.agents.map(agent => (
-                <div
-                  key={agent.id}
-                  draggable
-                  onDragStart={() => handleDragStart(agent.id)}
-                  onDragOver={e => handleDragOver(e, agent.id)}
-                  onDragEnd={handleDragEnd}
-                  className="flex-shrink-0 w-56"
-                >
-                  <AgentBox
-                    agent={agent}
-                    onSelect={() => onSelectAgent(agent)}
-                    onUpdateName={name => onUpdateAgent(agent.id, { name })}
-                    onUpdateStatus={(status: AgentStatus) =>
-                      onUpdateAgent(agent.id, { status })
-                    }
-                    onUpdateMode={(mode: AgentMode) =>
-                      onUpdateAgent(agent.id, { mode })
-                    }
-                    onDelete={() => onRemoveAgent(agent.id)}
-                    onFork={() => onForkAgent(agent.id)}
-                    isDragging={draggedAgent === agent.id}
-                  />
-                </div>
-              ))}
-            </div>
+            <ScrollArea className="w-full">
+              <div className="flex gap-3 pb-3">
+                {worktree.agents.map(agent => (
+                  <div
+                    key={agent.id}
+                    draggable
+                    onDragStart={() => handleDragStart(agent.id)}
+                    onDragOver={e => handleDragOver(e, agent.id)}
+                    onDragEnd={handleDragEnd}
+                    className="flex-shrink-0 w-56"
+                  >
+                    <AgentBox
+                      agent={agent}
+                      onSelect={() => onSelectAgent(agent)}
+                      onUpdateName={name => onUpdateAgent(agent.id, { name })}
+                      onUpdateStatus={(status: AgentStatus) =>
+                        onUpdateAgent(agent.id, { status })
+                      }
+                      onUpdateMode={(mode: AgentMode) =>
+                        onUpdateAgent(agent.id, { mode })
+                      }
+                      onDelete={() => onRemoveAgent(agent.id)}
+                      onFork={() => onForkAgent(agent.id)}
+                      isDragging={draggedAgent === agent.id}
+                    />
+                  </div>
+                ))}
+              </div>
+              <ScrollBar orientation="horizontal" />
+            </ScrollArea>
           )}
         </div>
       </div>
