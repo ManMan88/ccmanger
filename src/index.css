@@ -2,87 +2,123 @@
 @tailwind components;
 @tailwind utilities;
 
-/* Definition of the design system. All colors, gradients, fonts, etc should be defined here. 
-All colors MUST be HSL.
-*/
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
     --background: 0 0% 100%;
-    --foreground: 222.2 84% 4.9%;
+    --foreground: 240 10% 10%;
 
-    --card: 0 0% 100%;
-    --card-foreground: 222.2 84% 4.9%;
+    --card: 0 0% 98%;
+    --card-foreground: 240 10% 10%;
 
     --popover: 0 0% 100%;
-    --popover-foreground: 222.2 84% 4.9%;
+    --popover-foreground: 240 10% 10%;
 
-    --primary: 222.2 47.4% 11.2%;
-    --primary-foreground: 210 40% 98%;
+    --primary: 220 70% 50%;
+    --primary-foreground: 0 0% 100%;
 
-    --secondary: 210 40% 96.1%;
-    --secondary-foreground: 222.2 47.4% 11.2%;
+    --secondary: 240 5% 92%;
+    --secondary-foreground: 240 10% 10%;
 
-    --muted: 210 40% 96.1%;
-    --muted-foreground: 215.4 16.3% 46.9%;
+    --muted: 240 5% 96%;
+    --muted-foreground: 240 5% 45%;
 
-    --accent: 210 40% 96.1%;
-    --accent-foreground: 222.2 47.4% 11.2%;
+    --accent: 240 5% 92%;
+    --accent-foreground: 240 10% 10%;
 
-    --destructive: 0 84.2% 60.2%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 84% 60%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 214.3 31.8% 91.4%;
-    --input: 214.3 31.8% 91.4%;
-    --ring: 222.2 84% 4.9%;
+    --border: 240 5% 88%;
+    --input: 240 5% 88%;
+    --ring: 220 70% 50%;
 
     --radius: 0.5rem;
 
+    /* Status colors */
+    --status-running: 142 76% 45%;
+    --status-waiting: 38 92% 55%;
+    --status-error: 0 84% 60%;
+    --status-finished: 240 5% 50%;
+
+    /* Agent box */
+    --agent-bg: 0 0% 96%;
+    --agent-border: 240 5% 85%;
+
+    /* Toolbar */
+    --toolbar-bg: 0 0% 98%;
+    --toolbar-border: 240 5% 88%;
+
+    /* Worktree */
+    --worktree-bg: 0 0% 100%;
+    --worktree-header: 240 5% 96%;
+
+    /* Usage bar */
+    --usage-bg: 0 0% 96%;
+    --usage-fill: 220 70% 50%;
+
     --sidebar-background: 0 0% 98%;
-
     --sidebar-foreground: 240 5.3% 26.1%;
-
     --sidebar-primary: 240 5.9% 10%;
-
     --sidebar-primary-foreground: 0 0% 98%;
-
     --sidebar-accent: 240 4.8% 95.9%;
-
     --sidebar-accent-foreground: 240 5.9% 10%;
-
     --sidebar-border: 220 13% 91%;
-
     --sidebar-ring: 217.2 91.2% 59.8%;
   }
 
   .dark {
-    --background: 222.2 84% 4.9%;
-    --foreground: 210 40% 98%;
+    --background: 240 6% 7%;
+    --foreground: 0 0% 95%;
 
-    --card: 222.2 84% 4.9%;
-    --card-foreground: 210 40% 98%;
+    --card: 240 6% 10%;
+    --card-foreground: 0 0% 95%;
 
-    --popover: 222.2 84% 4.9%;
-    --popover-foreground: 210 40% 98%;
+    --popover: 240 6% 10%;
+    --popover-foreground: 0 0% 95%;
 
-    --primary: 210 40% 98%;
-    --primary-foreground: 222.2 47.4% 11.2%;
+    --primary: 217 91% 60%;
+    --primary-foreground: 240 6% 7%;
 
-    --secondary: 217.2 32.6% 17.5%;
-    --secondary-foreground: 210 40% 98%;
+    --secondary: 240 5% 17%;
+    --secondary-foreground: 0 0% 95%;
 
-    --muted: 217.2 32.6% 17.5%;
-    --muted-foreground: 215 20.2% 65.1%;
+    --muted: 240 5% 17%;
+    --muted-foreground: 240 5% 60%;
 
-    --accent: 217.2 32.6% 17.5%;
-    --accent-foreground: 210 40% 98%;
+    --accent: 240 5% 17%;
+    --accent-foreground: 0 0% 95%;
 
-    --destructive: 0 62.8% 30.6%;
-    --destructive-foreground: 210 40% 98%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 100%;
 
-    --border: 217.2 32.6% 17.5%;
-    --input: 217.2 32.6% 17.5%;
-    --ring: 212.7 26.8% 83.9%;
+    --border: 240 5% 20%;
+    --input: 240 5% 20%;
+    --ring: 217 91% 60%;
+
+    /* Status colors */
+    --status-running: 142 76% 45%;
+    --status-waiting: 38 92% 55%;
+    --status-error: 0 72% 55%;
+    --status-finished: 240 5% 45%;
+
+    /* Agent box */
+    --agent-bg: 240 6% 12%;
+    --agent-border: 240 5% 22%;
+
+    /* Toolbar */
+    --toolbar-bg: 240 6% 9%;
+    --toolbar-border: 240 5% 15%;
+
+    /* Worktree */
+    --worktree-bg: 240 6% 9%;
+    --worktree-header: 240 6% 12%;
+
+    /* Usage bar */
+    --usage-bg: 240 6% 12%;
+    --usage-fill: 217 91% 60%;
+
     --sidebar-background: 240 5.9% 10%;
     --sidebar-foreground: 240 4.8% 95.9%;
     --sidebar-primary: 224.3 76.3% 48%;
@@ -100,6 +136,108 @@ All colors MUST be HSL.
   }
 
   body {
-    @apply bg-background text-foreground;
+    @apply bg-background text-foreground font-sans antialiased;
+    font-family: 'Inter', system-ui, sans-serif;
+  }
+
+  .font-mono {
+    font-family: 'JetBrains Mono', monospace;
+  }
+}
+
+@layer components {
+  .agent-box {
+    @apply relative rounded-lg p-3 transition-all duration-200 cursor-pointer;
+    @apply bg-agent border-2;
+    @apply hover:shadow-lg hover:scale-[1.02];
+  }
+
+  .agent-box-running {
+    @apply border-status-running;
+    box-shadow: 0 0 12px hsl(var(--status-running) / 0.3);
+  }
+
+  .agent-box-waiting {
+    @apply border-status-waiting;
+    box-shadow: 0 0 12px hsl(var(--status-waiting) / 0.3);
+  }
+
+  .agent-box-error {
+    @apply border-status-error;
+    box-shadow: 0 0 12px hsl(var(--status-error) / 0.3);
+  }
+
+  .agent-box-finished {
+    @apply border-status-finished;
+  }
+
+  .worktree-row {
+    @apply rounded-xl overflow-hidden;
+    @apply bg-worktree border border-border;
+  }
+
+  .worktree-header {
+    @apply px-4 py-3 flex items-center justify-between;
+    @apply bg-worktree-header border-b border-border;
+  }
+
+  .toolbar {
+    @apply h-14 px-4 flex items-center justify-between;
+    @apply bg-toolbar border-b border-toolbar-border;
+  }
+
+  .usage-bar {
+    @apply h-10 px-4 flex items-center justify-between;
+    @apply bg-usage border-t border-border;
+  }
+
+  .context-indicator {
+    @apply text-xs font-mono px-2 py-0.5 rounded-full;
+    @apply bg-muted text-muted-foreground;
+  }
+
+  .status-dot {
+    @apply w-2 h-2 rounded-full;
+  }
+
+  .status-dot-running {
+    @apply bg-status-running animate-pulse;
+  }
+
+  .status-dot-waiting {
+    @apply bg-status-waiting;
+  }
+
+  .status-dot-error {
+    @apply bg-status-error;
+  }
+
+  .status-dot-finished {
+    @apply bg-status-finished;
+  }
+}
+
+@layer utilities {
+  .drag-handle {
+    @apply cursor-grab active:cursor-grabbing;
+  }
+
+  .scrollbar-thin {
+    scrollbar-width: thin;
+    scrollbar-color: hsl(var(--muted)) transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-track {
+    background: transparent;
+  }
+
+  .scrollbar-thin::-webkit-scrollbar-thumb {
+    background: hsl(var(--muted));
+    border-radius: 3px;
   }
 }
