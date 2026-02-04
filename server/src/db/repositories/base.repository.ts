@@ -3,7 +3,7 @@ import { generateId } from '@claude-manager/shared'
 
 export type IdPrefix = 'ws' | 'wt' | 'ag' | 'msg' | 'ses'
 
-export abstract class BaseRepository<TRow> {
+export abstract class BaseRepository<_TRow> {
   constructor(protected readonly db: Database.Database) {}
 
   protected generateId(prefix: IdPrefix): string {

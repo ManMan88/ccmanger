@@ -14,6 +14,10 @@ const envSchema = z.object({
 
   // CORS configuration
   CORS_ORIGIN: z.string().default('http://localhost:8080'),
+
+  // Claude CLI configuration
+  CLAUDE_CLI_PATH: z.string().default('claude'),
+  CLAUDE_CLI_TIMEOUT: z.coerce.number().positive().default(300000), // 5 minutes
 })
 
 export type Env = z.infer<typeof envSchema>

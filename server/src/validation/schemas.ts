@@ -76,6 +76,14 @@ export const ForkAgentSchema = z.object({
   name: z.string().min(1).max(100).optional(),
 })
 
+export const StartAgentSchema = z.object({
+  initialPrompt: z.string().max(50000).optional(),
+})
+
+export const StopAgentSchema = z.object({
+  force: z.boolean().optional().default(false),
+})
+
 // Query parameter schemas
 export const AgentQuerySchema = z.object({
   worktreeId: WorktreeIdSchema.optional(),
@@ -119,6 +127,8 @@ export type UpdateAgentInput = z.infer<typeof UpdateAgentSchema>
 export type SendMessageInput = z.infer<typeof SendMessageSchema>
 export type ReorderAgentsInput = z.infer<typeof ReorderAgentsSchema>
 export type ForkAgentInput = z.infer<typeof ForkAgentSchema>
+export type StartAgentInput = z.infer<typeof StartAgentSchema>
+export type StopAgentInput = z.infer<typeof StopAgentSchema>
 export type AgentQueryInput = z.infer<typeof AgentQuerySchema>
 export type MessageQueryInput = z.infer<typeof MessageQuerySchema>
 export type UsageQueryInput = z.infer<typeof UsageQuerySchema>

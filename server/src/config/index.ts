@@ -27,6 +27,12 @@ export const config = {
     origin: env.CORS_ORIGIN,
   },
 
+  // Claude CLI
+  claude: {
+    cliPath: env.CLAUDE_CLI_PATH,
+    timeout: env.CLAUDE_CLI_TIMEOUT,
+  },
+
   // Directories
   dataDir,
 } as const

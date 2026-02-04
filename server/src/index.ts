@@ -3,11 +3,21 @@ import { config } from './config/index.js'
 import { initDatabase, closeDatabase } from './db/index.js'
 import { runMigrations } from './db/migrate.js'
 import { logger } from './utils/logger.js'
+import { getProcessManager, resetProcessManager } from './services/process.service.js'
+import { AgentRepository } from './db/repositories/agent.repository.js'
 
 async function main() {
   // Initialize database and run migrations
   const db = initDatabase()
   runMigrations(db)
+
+  // Clean up orphaned processes from previous runs
+  // (agents marked as running/waiting but the process is gone)
+  const agentRepo = new AgentRepository(db)
+  const orphanedCount = agentRepo.clearPidForRunningAgents()
+  if (orphanedCount > 0) {
+    logger.info({ count: orphanedCount }, 'Cleared orphaned agent processes from previous run')
+  }
 
   // Build and start the server
   const app = await buildApp()
@@ -17,6 +27,17 @@ async function main() {
     logger.info({ signal }, 'Shutdown signal received')
 
     try {
+      // Stop all running agent processes
+      const processManager = getProcessManager()
+      const runningCount = processManager.getRunningCount()
+      if (runningCount > 0) {
+        logger.info({ count: runningCount }, 'Stopping running agent processes')
+        await processManager.stopAllAgents()
+      }
+
+      // Cleanup process manager
+      resetProcessManager()
+
       await app.close()
       logger.info('Server closed')
 

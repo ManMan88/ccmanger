@@ -245,69 +245,95 @@ PUT    /api/agents/reorder
 
 #### 2.1 Process Manager Core
 
-- [ ] Create `ProcessManager` class
-- [ ] Implement process spawning with `child_process.spawn`
-- [ ] Handle stdin/stdout/stderr streams
-- [ ] Implement process termination (graceful + force)
-- [ ] Add process event emitter
+- [x] Create `ProcessManager` class
+- [x] Implement process spawning with `child_process.spawn`
+- [x] Handle stdin/stdout/stderr streams
+- [x] Implement process termination (graceful + force)
+- [x] Add process event emitter
 
-**Deliverable:** Can spawn and manage child processes
+**Deliverable:** Can spawn and manage child processes ✅
 
 #### 2.2 Claude CLI Integration
 
-- [ ] Parse Claude CLI arguments for different modes
-- [ ] Handle Claude CLI output parsing
-- [ ] Detect agent status changes from output
-- [ ] Extract context level from status output
-- [ ] Handle session resumption
+- [x] Parse Claude CLI arguments for different modes
+- [x] Handle Claude CLI output parsing
+- [x] Detect agent status changes from output
+- [x] Extract context level from status output
+- [x] Handle session resumption
 
-**Deliverable:** Claude CLI spawns with correct arguments
+**Deliverable:** Claude CLI spawns with correct arguments ✅
 
 #### 2.3 Agent Lifecycle Management
 
-- [ ] Connect `ProcessManager` to `AgentService`
-- [ ] Implement `spawnAgent()` - spawn + update DB
-- [ ] Implement `stopAgent()` - terminate + update DB
-- [ ] Implement `sendMessage()` - write to stdin
-- [ ] Handle process crashes/exits
-- [ ] Clean up orphaned processes on startup
+- [x] Connect `ProcessManager` to `AgentService`
+- [x] Implement `spawnAgent()` - spawn + update DB
+- [x] Implement `stopAgent()` - terminate + update DB
+- [x] Implement `sendMessage()` - write to stdin
+- [x] Handle process crashes/exits
+- [x] Clean up orphaned processes on startup
 
-**Deliverable:** Full agent lifecycle management
+**Deliverable:** Full agent lifecycle management ✅
 
 #### 2.4 Message Handling
 
-- [ ] Save messages to database on send
-- [ ] Parse and save assistant responses
-- [ ] Track token counts (if available)
-- [ ] Implement message history retrieval
-- [ ] Add pagination for message history
+- [x] Save messages to database on send
+- [x] Parse and save assistant responses
+- [x] Track token counts (if available)
+- [x] Implement message history retrieval
+- [x] Add pagination for message history
 
-**Deliverable:** Persistent message history
+**Deliverable:** Persistent message history ✅
 
 #### 2.5 Agent Routes (Process Integration)
 
-- [ ] Add `POST /api/agents/:id/start` (spawn)
-- [ ] Add `POST /api/agents/:id/stop`
-- [ ] Add `POST /api/agents/:id/message`
-- [ ] Add `GET /api/agents/:id/messages`
-- [ ] Update agent creation to optionally auto-start
+- [x] Add `POST /api/agents/:id/start` (spawn)
+- [x] Add `POST /api/agents/:id/stop`
+- [x] Add `POST /api/agents/:id/message`
+- [x] Add `GET /api/agents/:id/messages`
+- [x] Update agent creation to optionally auto-start
 
-**Deliverable:** API can control agent processes
+**Deliverable:** API can control agent processes ✅
 
 ### Acceptance Criteria
 
-- [ ] Creating agent with `initialPrompt` starts process
-- [ ] Sending message writes to agent stdin
-- [ ] Stopping agent terminates process gracefully
-- [ ] Crashed agents marked as error status
-- [ ] Message history persists across restarts
-- [ ] Server startup cleans orphaned processes
+- [x] Creating agent with `initialPrompt` starts process
+- [x] Sending message writes to agent stdin
+- [x] Stopping agent terminates process gracefully
+- [x] Crashed agents marked as error status
+- [x] Message history persists across restarts
+- [x] Server startup cleans orphaned processes
 
 ### Testing
 
-- [ ] Unit tests with mocked child_process
+- [x] Unit tests with mocked child_process (31 tests)
 - [ ] Integration tests with real Claude CLI (optional, manual)
-- [ ] Process lifecycle tests
+- [x] Process lifecycle tests
+
+### API Endpoints Delivered
+
+```
+POST   /api/agents/:id/start       (spawn agent process)
+POST   /api/agents/:id/stop        (stop agent process)
+POST   /api/agents/:id/resume      (resume agent session)
+POST   /api/agents/:id/message     (send message to agent)
+GET    /api/agents/:id/messages    (get message history)
+GET    /api/agents/:id/status      (get real-time status)
+```
+
+### Files Created/Modified
+
+```
+server/src/services/process.service.ts  (NEW - ProcessManager)
+server/src/services/agent.service.ts    (Updated - process integration)
+server/src/services/index.ts            (Updated - exports)
+server/src/routes/agent.routes.ts       (Updated - process endpoints)
+server/src/config/env.ts                (Updated - Claude CLI config)
+server/src/config/index.ts              (Updated - Claude CLI config)
+server/src/index.ts                     (Updated - orphan cleanup, graceful shutdown)
+server/src/validation/schemas.ts        (Updated - new schemas)
+server/tests/unit/services/process.service.test.ts (NEW - 31 tests)
+server/tests/integration/agent.routes.test.ts (Updated - +9 tests)
+```
 
 ---
 

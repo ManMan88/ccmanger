@@ -1,5 +1,5 @@
 import { basename, join, dirname } from 'path'
-import type { Worktree, Agent, worktreeRowToApi, agentRowToApi } from '@claude-manager/shared'
+import type { Worktree, Agent } from '@claude-manager/shared'
 import { WorktreeRepository } from '../db/repositories/worktree.repository.js'
 import { AgentRepository } from '../db/repositories/agent.repository.js'
 import { WorkspaceRepository } from '../db/repositories/workspace.repository.js'

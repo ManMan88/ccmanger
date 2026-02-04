@@ -1,13 +1,6 @@
 import { basename } from 'path'
 import { existsSync } from 'fs'
-import type {
-  Workspace,
-  Worktree,
-  Agent,
-  workspaceRowToApi,
-  worktreeRowToApi,
-  agentRowToApi,
-} from '@claude-manager/shared'
+import type { Workspace, Worktree, Agent } from '@claude-manager/shared'
 import { WorkspaceRepository } from '../db/repositories/workspace.repository.js'
 import { WorktreeRepository } from '../db/repositories/worktree.repository.js'
 import { AgentRepository } from '../db/repositories/agent.repository.js'

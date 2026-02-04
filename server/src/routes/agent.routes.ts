@@ -138,29 +138,69 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
     }
   )
 
-  // POST /api/agents/:id/message - Send a message (placeholder for Phase 2)
+  // POST /api/agents/:id/message - Send a message to a running agent
   app.post<{ Params: AgentParams }>(
     '/api/agents/:id/message',
     async (request: FastifyRequest<{ Params: AgentParams }>, reply: FastifyReply) => {
       const body = SendMessageSchema.parse(request.body)
 
-      // For Phase 1, just save the message to the database
-      // Process management will be added in Phase 2
-      const message = await agentService.addMessage(request.params.id, 'user', body.content)
+      // Check if agent is running
+      if (!agentService.isAgentRunning(request.params.id)) {
+        // If not running, just save the message (for later when agent starts)
+        const message = await agentService.addMessage(request.params.id, 'user', body.content)
+        return reply.status(202).send({
+          messageId: message.id,
+          status: 'queued',
+          running: false,
+        })
+      }
 
+      // Send message to running agent
+      const message = await agentService.sendMessageToAgent(request.params.id, body.content)
       return reply.status(202).send({
         messageId: message.id,
-        status: 'queued',
+        status: 'sent',
+        running: true,
       })
     }
   )
 
-  // POST /api/agents/:id/stop - Stop agent (placeholder for Phase 2)
-  app.post<{ Params: AgentParams }>(
+  // POST /api/agents/:id/stop - Stop a running agent
+  app.post<{ Params: AgentParams; Querystring: { force?: string } }>(
     '/api/agents/:id/stop',
+    async (
+      request: FastifyRequest<{ Params: AgentParams; Querystring: { force?: string } }>,
+      reply: FastifyReply
+    ) => {
+      const force = request.query.force === 'true'
+      const agent = await agentService.stopAgent(request.params.id, force)
+      return reply.send(agent)
+    }
+  )
+
+  // POST /api/agents/:id/resume - Resume a stopped agent with session
+  app.post<{ Params: AgentParams }>(
+    '/api/agents/:id/resume',
     async (request: FastifyRequest<{ Params: AgentParams }>, reply: FastifyReply) => {
-      // Process management will be added in Phase 2
-      // For now, just update the agent status
+      const agent = await agentService.resumeAgent(request.params.id)
+      return reply.send(agent)
+    }
+  )
+
+  // POST /api/agents/:id/start - Start an agent process
+  app.post<{ Params: AgentParams }>(
+    '/api/agents/:id/start',
+    async (request: FastifyRequest<{ Params: AgentParams }>, reply: FastifyReply) => {
+      const body = (request.body || {}) as { initialPrompt?: string }
+      const agent = await agentService.startAgent(request.params.id, body.initialPrompt)
+      return reply.send(agent)
+    }
+  )
+
+  // GET /api/agents/:id/status - Get real-time process status
+  app.get<{ Params: AgentParams }>(
+    '/api/agents/:id/status',
+    async (request: FastifyRequest<{ Params: AgentParams }>, reply: FastifyReply) => {
       const agent = await agentService.getAgentById(request.params.id)
       if (!agent) {
         return reply.status(404).send({
@@ -168,35 +208,16 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         })
       }
 
-      const updatedRepo = agentRepo.update(request.params.id, {
-        status: 'finished',
-        pid: null,
-        stoppedAt: new Date().toISOString(),
-      })
+      const processStatus = agentService.getAgentProcessStatus(request.params.id)
+      const isRunning = agentService.isAgentRunning(request.params.id)
 
-      const { agentRowToApi } = await import('@claude-manager/shared')
-      return reply.send(agentRowToApi(updatedRepo!))
-    }
-  )
-
-  // POST /api/agents/:id/resume - Resume agent (placeholder for Phase 2)
-  app.post<{ Params: AgentParams }>(
-    '/api/agents/:id/resume',
-    async (request: FastifyRequest<{ Params: AgentParams }>, reply: FastifyReply) => {
-      // Process management will be added in Phase 2
-      return reply.status(501).send({
-        error: { code: 'NOT_IMPLEMENTED', message: 'Agent resume not yet implemented' },
-      })
-    }
-  )
-
-  // POST /api/agents/:id/start - Start agent (placeholder for Phase 2)
-  app.post<{ Params: AgentParams }>(
-    '/api/agents/:id/start',
-    async (request: FastifyRequest<{ Params: AgentParams }>, reply: FastifyReply) => {
-      // Process management will be added in Phase 2
-      return reply.status(501).send({
-        error: { code: 'NOT_IMPLEMENTED', message: 'Agent start not yet implemented' },
+      return reply.send({
+        id: agent.id,
+        status: agent.status,
+        processStatus,
+        isRunning,
+        contextLevel: agent.contextLevel,
+        pid: agent.pid,
       })
     }
   )

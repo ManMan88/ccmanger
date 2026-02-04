@@ -5,6 +5,7 @@ A GUI application for managing Claude Code CLI agents across git worktrees.
 ## Project Overview
 
 Claude Manager provides a visual interface to:
+
 - Manage git workspaces with multiple worktrees
 - Spawn, monitor, and interact with Claude Code CLI agents
 - Track agent status (running/waiting/error/finished) and context usage
@@ -17,21 +18,22 @@ Claude Manager provides a visual interface to:
 
 Comprehensive technical documentation is available in the `docs/` directory:
 
-| Document | Description |
-|----------|-------------|
-| [docs/README.md](docs/README.md) | Documentation index and quick start |
-| [docs/01-architecture-overview.md](docs/01-architecture-overview.md) | System architecture, tech stack, design patterns |
-| [docs/02-api-specification.md](docs/02-api-specification.md) | REST API & WebSocket specification |
-| [docs/03-database-schema.md](docs/03-database-schema.md) | SQLite schema and migrations |
-| [docs/04-backend-implementation.md](docs/04-backend-implementation.md) | Service layer implementation guide |
-| [docs/05-testing-strategy.md](docs/05-testing-strategy.md) | Unit, integration, and E2E testing |
-| [docs/06-ci-cd-pipeline.md](docs/06-ci-cd-pipeline.md) | GitHub Actions and Docker setup |
-| [docs/07-implementation-phases.md](docs/07-implementation-phases.md) | Phased delivery plan (7 phases) |
-| [docs/08-frontend-integration.md](docs/08-frontend-integration.md) | React Query and WebSocket integration |
+| Document                                                               | Description                                      |
+| ---------------------------------------------------------------------- | ------------------------------------------------ |
+| [docs/README.md](docs/README.md)                                       | Documentation index and quick start              |
+| [docs/01-architecture-overview.md](docs/01-architecture-overview.md)   | System architecture, tech stack, design patterns |
+| [docs/02-api-specification.md](docs/02-api-specification.md)           | REST API & WebSocket specification               |
+| [docs/03-database-schema.md](docs/03-database-schema.md)               | SQLite schema and migrations                     |
+| [docs/04-backend-implementation.md](docs/04-backend-implementation.md) | Service layer implementation guide               |
+| [docs/05-testing-strategy.md](docs/05-testing-strategy.md)             | Unit, integration, and E2E testing               |
+| [docs/06-ci-cd-pipeline.md](docs/06-ci-cd-pipeline.md)                 | GitHub Actions and Docker setup                  |
+| [docs/07-implementation-phases.md](docs/07-implementation-phases.md)   | Phased delivery plan (7 phases)                  |
+| [docs/08-frontend-integration.md](docs/08-frontend-integration.md)     | React Query and WebSocket integration            |
 
 ## Tech Stack
 
 ### Frontend (Implemented)
+
 - **Framework**: React 18.3 + TypeScript
 - **Build Tool**: Vite 5.4
 - **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix primitives)
@@ -40,6 +42,7 @@ Comprehensive technical documentation is available in the `docs/` directory:
 - **Icons**: Lucide React
 
 ### Backend (Planned)
+
 - **Runtime**: Node.js 20 LTS
 - **Framework**: Fastify 4.x
 - **Database**: SQLite (better-sqlite3)
@@ -91,13 +94,13 @@ claude-manager/
 
 ## Key Frontend Files
 
-| File | Purpose |
-|------|---------|
-| `src/hooks/useWorkspace.ts` | State management for workspace, worktrees, agents (currently mock data) |
-| `src/types/agent.ts` | Core type definitions: Agent, Worktree, Workspace, UsageStats |
-| `src/components/AgentBox.tsx` | Agent card with status, context level, mode/permission controls |
-| `src/components/WorktreeRow.tsx` | Worktree container with drag-drop, sorting, agent management |
-| `src/pages/Index.tsx` | Main page orchestrating all components |
+| File                             | Purpose                                                                 |
+| -------------------------------- | ----------------------------------------------------------------------- |
+| `src/hooks/useWorkspace.ts`      | State management for workspace, worktrees, agents (currently mock data) |
+| `src/types/agent.ts`             | Core type definitions: Agent, Worktree, Workspace, UsageStats           |
+| `src/components/AgentBox.tsx`    | Agent card with status, context level, mode/permission controls         |
+| `src/components/WorktreeRow.tsx` | Worktree container with drag-drop, sorting, agent management            |
+| `src/pages/Index.tsx`            | Main page orchestrating all components                                  |
 
 ## Development Commands
 
@@ -122,26 +125,26 @@ Core types in `src/types/agent.ts`:
 
 ```typescript
 interface Agent {
-  id: string;
-  name: string;
-  status: 'running' | 'waiting' | 'error' | 'finished';
-  contextLevel: number;  // 0-100 percentage
-  mode: 'auto' | 'plan' | 'regular';
-  permissions: string[];  // ['read', 'write', 'execute']
-  worktreeId: string;
-  createdAt: Date;
-  order: number;
+  id: string
+  name: string
+  status: 'running' | 'waiting' | 'error' | 'finished'
+  contextLevel: number // 0-100 percentage
+  mode: 'auto' | 'plan' | 'regular'
+  permissions: string[] // ['read', 'write', 'execute']
+  worktreeId: string
+  createdAt: Date
+  order: number
 }
 
 interface Worktree {
-  id: string;
-  name: string;
-  branch: string;
-  path: string;
-  agents: Agent[];
-  previousAgents: Agent[];  // Deleted agents for history
-  sortMode: 'free' | 'status' | 'name';
-  order: number;
+  id: string
+  name: string
+  branch: string
+  path: string
+  agents: Agent[]
+  previousAgents: Agent[] // Deleted agents for history
+  sortMode: 'free' | 'status' | 'name'
+  order: number
 }
 ```
 
@@ -178,17 +181,19 @@ See [docs/01-architecture-overview.md](docs/01-architecture-overview.md) for det
 
 ## Implementation Status
 
-| Component | Status | Documentation |
-|-----------|--------|---------------|
-| Frontend UI | ✅ Complete | - |
-| Frontend State (mock) | ✅ Complete | - |
-| Backend API | ⏳ Planned | [API Spec](docs/02-api-specification.md) |
-| Database | ⏳ Planned | [Schema](docs/03-database-schema.md) |
-| Process Management | ⏳ Planned | [Implementation](docs/04-backend-implementation.md) |
-| WebSocket | ⏳ Planned | [API Spec](docs/02-api-specification.md) |
-| Frontend Integration | ⏳ Planned | [Integration Guide](docs/08-frontend-integration.md) |
-| CI/CD | ⏳ Planned | [Pipeline](docs/06-ci-cd-pipeline.md) |
-| Testing | ⏳ Planned | [Strategy](docs/05-testing-strategy.md) |
+| Component                      | Status         | Documentation                                        |
+| ------------------------------ | -------------- | ---------------------------------------------------- |
+| Frontend UI                    | ✅ Complete    | -                                                    |
+| Frontend State (mock)          | ✅ Complete    | -                                                    |
+| Backend API (Phase 0-1)        | ✅ Complete    | [API Spec](docs/02-api-specification.md)             |
+| Database                       | ✅ Complete    | [Schema](docs/03-database-schema.md)                 |
+| Process Management (Phase 2)   | ✅ Complete    | [Implementation](docs/04-backend-implementation.md)  |
+| WebSocket (Phase 3)            | ⏳ Planned     | [API Spec](docs/02-api-specification.md)             |
+| Frontend Integration (Phase 4) | ⏳ Planned     | [Integration Guide](docs/08-frontend-integration.md) |
+| CI/CD                          | ✅ Complete    | [Pipeline](docs/06-ci-cd-pipeline.md)                |
+| Testing                        | ✅ In Progress | [Strategy](docs/05-testing-strategy.md)              |
+
+**Backend Test Coverage:** 112 tests passing (unit + integration)
 
 ## Component Hierarchy
 

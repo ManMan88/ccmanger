@@ -350,4 +350,100 @@ describe('Agent Routes Integration', () => {
       expect(body.messages[0].content).toBe('First message')
     })
   })
+
+  describe('POST /api/agents/:id/stop', () => {
+    it('should stop agent and update status', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/api/agents',
+        payload: { worktreeId, name: 'Test Agent' },
+      })
+      const agent = JSON.parse(createResponse.body)
+
+      const response = await app.inject({
+        method: 'POST',
+        url: `/api/agents/${agent.id}/stop`,
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = JSON.parse(response.body)
+      expect(body.status).toBe('finished')
+      expect(body.stoppedAt).toBeTruthy()
+    })
+
+    it('should return 404 for non-existent agent', async () => {
+      const response = await app.inject({
+        method: 'POST',
+        url: '/api/agents/ag_nonexistent/stop',
+      })
+
+      expect(response.statusCode).toBe(404)
+    })
+  })
+
+  describe('GET /api/agents/:id/status', () => {
+    it('should return agent status info', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/api/agents',
+        payload: { worktreeId, name: 'Test Agent' },
+      })
+      const agent = JSON.parse(createResponse.body)
+
+      const response = await app.inject({
+        method: 'GET',
+        url: `/api/agents/${agent.id}/status`,
+      })
+
+      expect(response.statusCode).toBe(200)
+      const body = JSON.parse(response.body)
+      expect(body.id).toBe(agent.id)
+      expect(body.status).toBe('waiting')
+      expect(body.isRunning).toBe(false)
+    })
+
+    it('should return 404 for non-existent agent', async () => {
+      const response = await app.inject({
+        method: 'GET',
+        url: '/api/agents/ag_nonexistent/status',
+      })
+
+      expect(response.statusCode).toBe(404)
+    })
+  })
+
+  describe('POST /api/agents/:id/restore', () => {
+    it('should restore a deleted agent', async () => {
+      const createResponse = await app.inject({
+        method: 'POST',
+        url: '/api/agents',
+        payload: { worktreeId, name: 'Agent to Restore' },
+      })
+      const agent = JSON.parse(createResponse.body)
+
+      // Delete the agent
+      await app.inject({
+        method: 'DELETE',
+        url: `/api/agents/${agent.id}`,
+      })
+
+      // Verify it's deleted
+      const getDeletedResponse = await app.inject({
+        method: 'GET',
+        url: `/api/agents/${agent.id}`,
+      })
+      expect(JSON.parse(getDeletedResponse.body).deletedAt).toBeTruthy()
+
+      // Restore the agent
+      const restoreResponse = await app.inject({
+        method: 'POST',
+        url: `/api/agents/${agent.id}/restore`,
+      })
+
+      expect(restoreResponse.statusCode).toBe(200)
+      const restored = JSON.parse(restoreResponse.body)
+      expect(restored.deletedAt).toBeNull()
+      expect(restored.status).toBe('waiting')
+    })
+  })
 })
