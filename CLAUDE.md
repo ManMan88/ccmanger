@@ -11,42 +11,85 @@ Claude Manager provides a visual interface to:
 - Configure agent modes (auto-approve/plan/regular) and permissions
 - View API usage statistics
 
-**Current State**: Frontend prototype with mock data. Backend integration pending.
+**Current State**: Frontend prototype with mock data. Backend implementation documented in `docs/`.
+
+## Documentation
+
+Comprehensive technical documentation is available in the `docs/` directory:
+
+| Document | Description |
+|----------|-------------|
+| [docs/README.md](docs/README.md) | Documentation index and quick start |
+| [docs/01-architecture-overview.md](docs/01-architecture-overview.md) | System architecture, tech stack, design patterns |
+| [docs/02-api-specification.md](docs/02-api-specification.md) | REST API & WebSocket specification |
+| [docs/03-database-schema.md](docs/03-database-schema.md) | SQLite schema and migrations |
+| [docs/04-backend-implementation.md](docs/04-backend-implementation.md) | Service layer implementation guide |
+| [docs/05-testing-strategy.md](docs/05-testing-strategy.md) | Unit, integration, and E2E testing |
+| [docs/06-ci-cd-pipeline.md](docs/06-ci-cd-pipeline.md) | GitHub Actions and Docker setup |
+| [docs/07-implementation-phases.md](docs/07-implementation-phases.md) | Phased delivery plan (7 phases) |
+| [docs/08-frontend-integration.md](docs/08-frontend-integration.md) | React Query and WebSocket integration |
 
 ## Tech Stack
 
+### Frontend (Implemented)
 - **Framework**: React 18.3 + TypeScript
 - **Build Tool**: Vite 5.4
 - **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix primitives)
-- **State**: React hooks + React Query
+- **State**: React hooks + React Query (installed, integration pending)
 - **Forms**: React Hook Form + Zod validation
 - **Icons**: Lucide React
+
+### Backend (Planned)
+- **Runtime**: Node.js 20 LTS
+- **Framework**: Fastify 4.x
+- **Database**: SQLite (better-sqlite3)
+- **Real-time**: @fastify/websocket
+- **Git**: simple-git
+- **Validation**: Zod
 
 ## Project Structure
 
 ```
-src/
-├── pages/
-│   └── Index.tsx           # Main dashboard page
-├── components/
-│   ├── Toolbar.tsx         # Top navigation bar
-│   ├── WorktreeRow.tsx     # Worktree container with agents
-│   ├── AgentBox.tsx        # Individual agent card
-│   ├── AgentModal.tsx      # Agent interaction dialog
-│   ├── AddWorktreeDialog.tsx
-│   ├── SettingsDialog.tsx
-│   ├── UsageBar.tsx        # API usage display
-│   └── ui/                 # shadcn/ui components (40+)
-├── hooks/
-│   ├── useWorkspace.ts     # Workspace/agent state management
-│   └── useTheme.ts         # Light/dark theme toggle
-├── types/
-│   └── agent.ts            # TypeScript interfaces
-└── lib/
-    └── utils.ts            # Tailwind merge utilities
+claude-manager/
+├── docs/                          # Technical documentation
+│   ├── README.md                  # Documentation index
+│   ├── 01-architecture-overview.md
+│   ├── 02-api-specification.md
+│   ├── 03-database-schema.md
+│   ├── 04-backend-implementation.md
+│   ├── 05-testing-strategy.md
+│   ├── 06-ci-cd-pipeline.md
+│   ├── 07-implementation-phases.md
+│   └── 08-frontend-integration.md
+│
+├── src/                           # Frontend source
+│   ├── pages/
+│   │   └── Index.tsx              # Main dashboard page
+│   ├── components/
+│   │   ├── Toolbar.tsx            # Top navigation bar
+│   │   ├── WorktreeRow.tsx        # Worktree container with agents
+│   │   ├── AgentBox.tsx           # Individual agent card
+│   │   ├── AgentModal.tsx         # Agent interaction dialog
+│   │   ├── AddWorktreeDialog.tsx
+│   │   ├── SettingsDialog.tsx
+│   │   ├── UsageBar.tsx           # API usage display
+│   │   └── ui/                    # shadcn/ui components (40+)
+│   ├── hooks/
+│   │   ├── useWorkspace.ts        # Workspace/agent state (mock data)
+│   │   └── useTheme.ts            # Light/dark theme toggle
+│   ├── types/
+│   │   └── agent.ts               # TypeScript interfaces
+│   └── lib/
+│       └── utils.ts               # Tailwind merge utilities
+│
+├── server/                        # Backend (to be implemented)
+│   └── (see docs/01-architecture-overview.md)
+│
+└── shared/                        # Shared types (to be created)
+    └── types.ts
 ```
 
-## Key Files
+## Key Frontend Files
 
 | File | Purpose |
 |------|---------|
@@ -59,11 +102,18 @@ src/
 ## Development Commands
 
 ```bash
+# Frontend
 npm install          # Install dependencies
 npm run dev          # Start dev server (port 8080)
 npm run build        # Production build
 npm run test         # Run tests (Vitest)
 npm run lint         # ESLint check
+
+# Backend (after implementation)
+cd server
+npm run dev          # Start dev server (port 3001)
+npm run test         # Run backend tests
+npm run migrate      # Run database migrations
 ```
 
 ## Type Definitions
@@ -95,57 +145,50 @@ interface Worktree {
 }
 ```
 
-## Architecture Notes
-
-### Current Architecture (Frontend Only)
-- All state is in-memory using React hooks
-- Mock data in `useWorkspace.ts` simulates backend
-- No persistence - data lost on refresh
-- No actual Claude CLI integration
-
-### Planned Backend: Node.js + Fastify
-
-Recommended stack for seamless TypeScript integration:
+## Architecture Overview
 
 ```
-server/
-├── src/
-│   ├── routes/
-│   │   ├── workspace.ts    # GET/POST/DELETE /api/workspace
-│   │   ├── worktree.ts     # Worktree CRUD + git operations
-│   │   └── agent.ts        # Agent lifecycle + WebSocket streaming
-│   ├── services/
-│   │   ├── git.ts          # Git operations via simple-git
-│   │   ├── agent-process.ts # Claude CLI spawning & management
-│   │   └── claude-api.ts   # Anthropic SDK for direct API calls
-│   ├── websocket/
-│   │   └── agent-stream.ts # Real-time agent output streaming
-│   ├── db/
-│   │   └── schema.ts       # SQLite/Postgres schema
-│   └── index.ts            # Fastify server entry
-├── shared/
-│   └── types.ts            # Types shared with frontend
-└── package.json
+┌─────────────────────────────────────────────────────────────────┐
+│                         Frontend                                 │
+│  React + TypeScript + Tailwind + shadcn/ui + React Query        │
+└─────────────────────────────────────────────────────────────────┘
+                    │ REST API          │ WebSocket
+                    ▼                   ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                         Backend                                  │
+│  Fastify + TypeScript + @fastify/websocket                      │
+├─────────────────────────────────────────────────────────────────┤
+│  Services: Workspace | Worktree | Agent | Git | Process | Usage │
+└─────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                      Data Layer                                  │
+│  SQLite (better-sqlite3) + File System (git repos, logs)        │
+└─────────────────────────────────────────────────────────────────┘
+                    │
+                    ▼
+┌─────────────────────────────────────────────────────────────────┐
+│                   External Systems                               │
+│  Claude Code CLI | Git CLI | Anthropic API (optional)           │
+└─────────────────────────────────────────────────────────────────┘
 ```
 
-Key capabilities:
-- **Process Management**: Spawn/stop Claude CLI via `child_process.spawn()`
-- **Git Operations**: `simple-git` library for worktree add/remove, checkout
-- **Real-time**: WebSocket via `@fastify/websocket` for agent streaming
-- **Claude API**: Official `@anthropic-ai/sdk` with streaming support
-- **Persistence**: SQLite via `better-sqlite3` or PostgreSQL
+See [docs/01-architecture-overview.md](docs/01-architecture-overview.md) for detailed architecture documentation.
 
-Backend dependencies:
-```json
-{
-  "fastify": "^4.x",
-  "@fastify/websocket": "^8.x",
-  "@anthropic-ai/sdk": "^0.x",
-  "simple-git": "^3.x",
-  "better-sqlite3": "^9.x",
-  "zod": "^3.x"
-}
-```
+## Implementation Status
+
+| Component | Status | Documentation |
+|-----------|--------|---------------|
+| Frontend UI | ✅ Complete | - |
+| Frontend State (mock) | ✅ Complete | - |
+| Backend API | ⏳ Planned | [API Spec](docs/02-api-specification.md) |
+| Database | ⏳ Planned | [Schema](docs/03-database-schema.md) |
+| Process Management | ⏳ Planned | [Implementation](docs/04-backend-implementation.md) |
+| WebSocket | ⏳ Planned | [API Spec](docs/02-api-specification.md) |
+| Frontend Integration | ⏳ Planned | [Integration Guide](docs/08-frontend-integration.md) |
+| CI/CD | ⏳ Planned | [Pipeline](docs/06-ci-cd-pipeline.md) |
+| Testing | ⏳ Planned | [Strategy](docs/05-testing-strategy.md) |
 
 ## Component Hierarchy
 
