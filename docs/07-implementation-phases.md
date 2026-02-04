@@ -131,82 +131,82 @@ pnpm-workspace.yaml (update)
 
 #### 1.1 Repository Layer
 
-- [ ] Create base repository interface
-- [ ] Implement `WorkspaceRepository`
-- [ ] Implement `WorktreeRepository`
-- [ ] Implement `AgentRepository`
-- [ ] Implement `MessageRepository`
-- [ ] Implement `UsageStatsRepository`
-- [ ] Write unit tests for all repositories
+- [x] Create base repository interface
+- [x] Implement `WorkspaceRepository`
+- [x] Implement `WorktreeRepository`
+- [x] Implement `AgentRepository`
+- [x] Implement `MessageRepository`
+- [x] Implement `UsageStatsRepository`
+- [x] Write unit tests for all repositories
 
-**Deliverable:** Data access layer with 80%+ coverage
+**Deliverable:** Data access layer with 80%+ coverage ✅
 
 #### 1.2 Validation Schemas
 
-- [ ] Create Zod schemas for all DTOs
-- [ ] Create request validation middleware
-- [ ] Create response serialization helpers
-- [ ] Add validation error formatting
+- [x] Create Zod schemas for all DTOs
+- [x] Create request validation middleware (Zod parsing in routes)
+- [x] Create response serialization helpers (shared type converters)
+- [x] Add validation error formatting (error handler middleware)
 
-**Deliverable:** Type-safe API validation
+**Deliverable:** Type-safe API validation ✅
 
 #### 1.3 Workspace Service & Routes
 
-- [ ] Implement `WorkspaceService`
-  - [ ] `createWorkspace(path)`
-  - [ ] `getWorkspace(id)`
-  - [ ] `listWorkspaces()`
-  - [ ] `deleteWorkspace(id)`
-- [ ] Create workspace routes
-- [ ] Write integration tests
+- [x] Implement `WorkspaceService`
+  - [x] `createWorkspace(path)`
+  - [x] `getWorkspace(id)`
+  - [x] `listWorkspaces()`
+  - [x] `deleteWorkspace(id)`
+- [x] Create workspace routes
+- [x] Write integration tests
 
-**Deliverable:** Working `/api/workspaces` endpoints
+**Deliverable:** Working `/api/workspaces` endpoints ✅
 
 #### 1.4 Worktree Service & Routes
 
-- [ ] Implement `GitService`
-  - [ ] `isValidRepository()`
-  - [ ] `listWorktrees()`
-  - [ ] `addWorktree()`
-  - [ ] `removeWorktree()`
-  - [ ] `checkout()`
-- [ ] Implement `WorktreeService`
-- [ ] Create worktree routes
-- [ ] Write integration tests
+- [x] Implement `GitService`
+  - [x] `isValidRepository()`
+  - [x] `listWorktrees()`
+  - [x] `addWorktree()`
+  - [x] `removeWorktree()`
+  - [x] `checkout()`
+- [x] Implement `WorktreeService`
+- [x] Create worktree routes
+- [x] Write integration tests
 
-**Deliverable:** Working `/api/worktrees` endpoints with git operations
+**Deliverable:** Working `/api/worktrees` endpoints with git operations ✅
 
 #### 1.5 Agent Service & Routes (Basic)
 
-- [ ] Implement `AgentService` (without process management)
-  - [ ] `createAgent()`
-  - [ ] `getAgent()`
-  - [ ] `updateAgent()`
-  - [ ] `deleteAgent()`
-  - [ ] `forkAgent()`
-  - [ ] `reorderAgents()`
-- [ ] Create agent routes
-- [ ] Write integration tests
+- [x] Implement `AgentService` (without process management)
+  - [x] `createAgent()`
+  - [x] `getAgent()`
+  - [x] `updateAgent()`
+  - [x] `deleteAgent()`
+  - [x] `forkAgent()`
+  - [x] `reorderAgents()`
+- [x] Create agent routes
+- [x] Write integration tests
 
-**Deliverable:** Working `/api/agents` CRUD endpoints
+**Deliverable:** Working `/api/agents` CRUD endpoints ✅
 
 #### 1.6 Error Handling
 
-- [ ] Create custom error classes
-- [ ] Implement global error handler
-- [ ] Add request logging middleware
-- [ ] Create error response formatter
+- [x] Create custom error classes
+- [x] Implement global error handler
+- [x] Add request logging middleware
+- [x] Create error response formatter
 
-**Deliverable:** Consistent error responses across API
+**Deliverable:** Consistent error responses across API ✅
 
 ### Acceptance Criteria
 
-- [ ] All CRUD operations work for workspaces, worktrees, agents
-- [ ] Git operations create/delete worktrees correctly
-- [ ] Validation errors return 400 with details
-- [ ] Not found errors return 404
-- [ ] All endpoints have integration tests
-- [ ] Code coverage > 80%
+- [x] All CRUD operations work for workspaces, worktrees, agents
+- [x] Git operations create/delete worktrees correctly
+- [x] Validation errors return 400 with details
+- [x] Not found errors return 404
+- [x] All endpoints have integration tests
+- [x] Code coverage > 80% (76 tests passing)
 
 ### API Endpoints Delivered
 
