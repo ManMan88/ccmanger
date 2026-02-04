@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { Worktree, Agent, AgentStatus, AgentMode } from '@/types/agent';
+import { useState, useMemo } from 'react';
+import { Worktree, Agent, AgentStatus, AgentMode, AgentSortMode } from '@/types/agent';
 import { AgentBox } from './AgentBox';
 import {
   Plus,
@@ -8,6 +8,8 @@ import {
   History,
   ChevronDown,
   MoreHorizontal,
+  ArrowUpDown,
+  GripVertical,
 } from 'lucide-react';
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
 import { Button } from '@/components/ui/button';
@@ -17,6 +19,9 @@ import {
   DropdownMenuItem,
   DropdownMenuSeparator,
   DropdownMenuTrigger,
+  DropdownMenuRadioGroup,
+  DropdownMenuRadioItem,
+  DropdownMenuLabel,
 } from '@/components/ui/dropdown-menu';
 import {
   Dialog,
@@ -39,7 +44,19 @@ interface WorktreeRowProps {
   onRemoveWorktree: () => void;
   onCheckoutBranch: (branch: string) => void;
   onLoadPreviousAgent: (agentId: string) => void;
+  onSetSortMode: (sortMode: AgentSortMode) => void;
+  isDragging?: boolean;
+  onDragStart?: () => void;
+  onDragOver?: (e: React.DragEvent) => void;
+  onDragEnd?: () => void;
 }
+
+const statusOrder: Record<AgentStatus, number> = {
+  running: 0,
+  waiting: 1,
+  error: 2,
+  finished: 3,
+};
 
 export function WorktreeRow({
   worktree,
@@ -52,17 +69,37 @@ export function WorktreeRow({
   onRemoveWorktree,
   onCheckoutBranch,
   onLoadPreviousAgent,
+  onSetSortMode,
+  isDragging,
+  onDragStart,
+  onDragOver,
+  onDragEnd,
 }: WorktreeRowProps) {
   const [draggedAgent, setDraggedAgent] = useState<string | null>(null);
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
   const [newBranch, setNewBranch] = useState(worktree.branch);
 
+  const sortedAgents = useMemo(() => {
+    const agents = [...worktree.agents];
+    switch (worktree.sortMode) {
+      case 'status':
+        return agents.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+      case 'name':
+        return agents.sort((a, b) => a.name.localeCompare(b.name));
+      case 'free':
+      default:
+        return agents.sort((a, b) => a.order - b.order);
+    }
+  }, [worktree.agents, worktree.sortMode]);
+
   const handleDragStart = (agentId: string) => {
+    if (worktree.sortMode !== 'free') return;
     setDraggedAgent(agentId);
   };
 
   const handleDragOver = (e: React.DragEvent, targetAgentId: string) => {
     e.preventDefault();
+    if (worktree.sortMode !== 'free') return;
     if (!draggedAgent || draggedAgent === targetAgentId) return;
 
     const currentOrder = worktree.agents.map(a => a.id);
@@ -87,12 +124,27 @@ export function WorktreeRow({
     setCheckoutDialogOpen(false);
   };
 
+  const sortModeLabels: Record<AgentSortMode, string> = {
+    free: 'Free Arrangement',
+    status: 'By Status',
+    name: 'By Name',
+  };
+
   return (
     <>
-      <div className="worktree-row animate-slide-in">
+      <div 
+        className={`worktree-row animate-slide-in ${isDragging ? 'opacity-50 scale-[0.98]' : ''}`}
+        draggable
+        onDragStart={onDragStart}
+        onDragOver={onDragOver}
+        onDragEnd={onDragEnd}
+      >
         {/* Header */}
         <div className="worktree-header">
           <div className="flex items-center gap-3">
+            <div className="cursor-grab hover:bg-secondary p-1 rounded">
+              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            </div>
             <GitBranch className="w-4 h-4 text-muted-foreground" />
             <div>
               <h3 className="font-medium text-sm">{worktree.name}</h3>
@@ -103,6 +155,35 @@ export function WorktreeRow({
           </div>
 
           <div className="flex items-center gap-2">
+            {/* Sort Mode Dropdown */}
+            <DropdownMenu>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" className="gap-1.5 h-8">
+                  <ArrowUpDown className="w-3.5 h-3.5" />
+                  <span className="text-xs">{sortModeLabels[worktree.sortMode]}</span>
+                  <ChevronDown className="w-3 h-3 opacity-50" />
+                </Button>
+              </DropdownMenuTrigger>
+              <DropdownMenuContent align="end" className="w-48 bg-popover">
+                <DropdownMenuLabel className="text-xs">Sort Agents</DropdownMenuLabel>
+                <DropdownMenuSeparator />
+                <DropdownMenuRadioGroup 
+                  value={worktree.sortMode} 
+                  onValueChange={(value) => onSetSortMode(value as AgentSortMode)}
+                >
+                  <DropdownMenuRadioItem value="free">
+                    Free Arrangement
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="status">
+                    By Status
+                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="name">
+                    By Name
+                  </DropdownMenuRadioItem>
+                </DropdownMenuRadioGroup>
+              </DropdownMenuContent>
+            </DropdownMenu>
+
             {/* Previous Agents Dropdown */}
             {worktree.previousAgents.length > 0 && (
               <DropdownMenu>
@@ -178,14 +259,14 @@ export function WorktreeRow({
           ) : (
             <ScrollArea className="w-full">
               <div className="flex gap-3 pb-3">
-                {worktree.agents.map(agent => (
+                {sortedAgents.map(agent => (
                   <div
                     key={agent.id}
-                    draggable
+                    draggable={worktree.sortMode === 'free'}
                     onDragStart={() => handleDragStart(agent.id)}
                     onDragOver={e => handleDragOver(e, agent.id)}
                     onDragEnd={handleDragEnd}
-                    className="flex-shrink-0 w-56"
+                    className={`flex-shrink-0 w-56 ${worktree.sortMode !== 'free' ? 'cursor-default' : ''}`}
                   >
                     <AgentBox
                       agent={agent}
