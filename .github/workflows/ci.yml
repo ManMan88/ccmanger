@@ -56,15 +56,6 @@ jobs:
       - name: Build shared types
         run: pnpm --filter @claude-manager/shared build
 
-      - name: Debug - Check shared package
-        run: |
-          echo "=== Shared dist contents ==="
-          ls -la shared/dist/ || echo "No dist folder"
-          echo "=== Server node_modules/@claude-manager ==="
-          ls -la server/node_modules/@claude-manager/shared/ || echo "No symlink"
-          echo "=== Resolve test ==="
-          cd server && node -e "console.log(require.resolve('@claude-manager/shared'))" || echo "Cannot resolve"
-
       - name: Type check frontend
         run: pnpm exec tsc --noEmit
 
