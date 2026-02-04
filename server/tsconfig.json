@@ -12,11 +12,7 @@
     "declarationMap": true,
     "outDir": "./dist",
     "rootDir": "./src",
-    "resolveJsonModule": true,
-    "paths": {
-      "@shared/*": ["../shared/dist/*"],
-      "@claude-manager/shared": ["../shared/dist/index.d.ts"]
-    }
+    "resolveJsonModule": true
   },
   "include": ["src/**/*"],
   "exclude": ["node_modules", "dist"]
