@@ -14,11 +14,10 @@
     "rootDir": "./src",
     "resolveJsonModule": true,
     "paths": {
-      "@shared/*": ["../shared/src/*"],
-      "@claude-manager/shared": ["../shared/src/index.ts"]
+      "@shared/*": ["../shared/dist/*"],
+      "@claude-manager/shared": ["../shared/dist/index.d.ts"]
     }
   },
   "include": ["src/**/*"],
-  "exclude": ["node_modules", "dist"],
-  "references": [{ "path": "../shared" }]
+  "exclude": ["node_modules", "dist"]
 }
