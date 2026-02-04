@@ -14,7 +14,8 @@
     "rootDir": "./src",
     "resolveJsonModule": true,
     "paths": {
-      "@shared/*": ["../shared/src/*"]
+      "@shared/*": ["../shared/src/*"],
+      "@claude-manager/shared": ["../shared/src/index.ts"]
     }
   },
   "include": ["src/**/*"],
