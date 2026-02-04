@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { Agent, AgentMode } from '@/types/agent';
 import {
   Dialog,
@@ -10,6 +10,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { ScrollArea } from '@/components/ui/scroll-area';
+import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import {
   Send,
   Zap,
@@ -21,10 +22,12 @@ import {
 } from 'lucide-react';
 
 interface AgentModalProps {
-  agent: Agent | null;
+  agents: Agent[];
+  selectedAgentId: string | null;
   open: boolean;
   onClose: () => void;
-  onUpdateAgent: (updates: Partial<Agent>) => void;
+  onUpdateAgent: (agentId: string, updates: Partial<Agent>) => void;
+  onSelectAgent: (agentId: string) => void;
 }
 
 interface Message {
@@ -34,31 +37,60 @@ interface Message {
   timestamp: Date;
 }
 
+type AgentMessages = Record<string, Message[]>;
+
 const modeIcons: Record<AgentMode, typeof Zap> = {
   auto: Zap,
   plan: ClipboardList,
   regular: Settings2,
 };
 
-export function AgentModal({ agent, open, onClose, onUpdateAgent }: AgentModalProps) {
-  const [messages, setMessages] = useState<Message[]>([
-    {
-      id: '1',
-      role: 'assistant',
-      content: 'Hello! I\'m ready to help. What would you like me to work on?',
-      timestamp: new Date(),
-    },
-  ]);
+const statusClasses = {
+  running: 'bg-status-running',
+  waiting: 'bg-status-waiting',
+  error: 'bg-status-error',
+  finished: 'bg-status-finished',
+};
+
+export function AgentModal({ 
+  agents, 
+  selectedAgentId, 
+  open, 
+  onClose, 
+  onUpdateAgent,
+  onSelectAgent,
+}: AgentModalProps) {
+  const [agentMessages, setAgentMessages] = useState<AgentMessages>({});
   const [input, setInput] = useState('');
-  const [isEditingName, setIsEditingName] = useState(false);
-  const [editedName, setEditedName] = useState(agent?.name || '');
+  const [editingAgentId, setEditingAgentId] = useState<string | null>(null);
+  const [editedName, setEditedName] = useState('');
 
-  if (!agent) return null;
+  const currentAgent = agents.find(a => a.id === selectedAgentId);
 
-  const ModeIcon = modeIcons[agent.mode];
+  // Initialize messages for agents that don't have any
+  useEffect(() => {
+    agents.forEach(agent => {
+      if (!agentMessages[agent.id]) {
+        setAgentMessages(prev => ({
+          ...prev,
+          [agent.id]: [{
+            id: '1',
+            role: 'assistant',
+            content: `Hello! I'm ${agent.name}, ready to help. What would you like me to work on?`,
+            timestamp: new Date(),
+          }],
+        }));
+      }
+    });
+  }, [agents]);
+
+  if (!currentAgent || agents.length === 0) return null;
+
+  const messages = agentMessages[currentAgent.id] || [];
+  const ModeIcon = modeIcons[currentAgent.mode];
 
   const handleSend = () => {
-    if (!input.trim()) return;
+    if (!input.trim() || !currentAgent) return;
 
     const userMessage: Message = {
       id: Date.now().toString(),
@@ -67,7 +99,10 @@ export function AgentModal({ agent, open, onClose, onUpdateAgent }: AgentModalPr
       timestamp: new Date(),
     };
 
-    setMessages(prev => [...prev, userMessage]);
+    setAgentMessages(prev => ({
+      ...prev,
+      [currentAgent.id]: [...(prev[currentAgent.id] || []), userMessage],
+    }));
     setInput('');
 
     // Simulate assistant response
@@ -78,30 +113,63 @@ export function AgentModal({ agent, open, onClose, onUpdateAgent }: AgentModalPr
         content: 'I understand. Let me work on that for you...',
         timestamp: new Date(),
       };
-      setMessages(prev => [...prev, assistantMessage]);
+      setAgentMessages(prev => ({
+        ...prev,
+        [currentAgent.id]: [...(prev[currentAgent.id] || []), assistantMessage],
+      }));
     }, 500);
   };
 
-  const handleSaveName = () => {
-    onUpdateAgent({ name: editedName });
-    setIsEditingName(false);
+  const handleStartEditing = (agent: Agent) => {
+    setEditedName(agent.name);
+    setEditingAgentId(agent.id);
   };
 
-  const statusClasses = {
-    running: 'bg-status-running',
-    waiting: 'bg-status-waiting',
-    error: 'bg-status-error',
-    finished: 'bg-status-finished',
+  const handleSaveName = () => {
+    if (editingAgentId) {
+      onUpdateAgent(editingAgentId, { name: editedName });
+      setEditingAgentId(null);
+    }
   };
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
-      <DialogContent className="max-w-3xl h-[80vh] flex flex-col p-0 bg-card">
-        <DialogHeader className="px-6 py-4 border-b border-border flex-shrink-0">
+      <DialogContent className="max-w-4xl h-[85vh] flex flex-col p-0 bg-card">
+        {/* Tabs Header - Linux CLI style */}
+        <div className="border-b border-border bg-muted/30">
+          <ScrollArea className="w-full">
+            <Tabs 
+              value={selectedAgentId || ''} 
+              onValueChange={onSelectAgent}
+              className="w-full"
+            >
+              <TabsList className="h-auto p-0 bg-transparent rounded-none justify-start w-max">
+                {agents.map((agent, index) => (
+                  <TabsTrigger
+                    key={agent.id}
+                    value={agent.id}
+                    className="relative px-4 py-2.5 rounded-none border-r border-border data-[state=active]:bg-card data-[state=active]:shadow-none data-[state=inactive]:bg-muted/50 gap-2 min-w-[140px]"
+                  >
+                    <div className={`w-2 h-2 rounded-full ${statusClasses[agent.status]}`} />
+                    <span className="truncate max-w-[100px] text-xs font-medium">
+                      {agent.name}
+                    </span>
+                    <span className="text-[10px] text-muted-foreground ml-1">
+                      {agent.contextLevel}%
+                    </span>
+                  </TabsTrigger>
+                ))}
+              </TabsList>
+            </Tabs>
+          </ScrollArea>
+        </div>
+
+        {/* Agent Header */}
+        <DialogHeader className="px-6 py-3 border-b border-border flex-shrink-0">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-3">
-              <div className={`w-3 h-3 rounded-full ${statusClasses[agent.status]}`} />
-              {isEditingName ? (
+              <div className={`w-3 h-3 rounded-full ${statusClasses[currentAgent.status]}`} />
+              {editingAgentId === currentAgent.id ? (
                 <div className="flex items-center gap-2">
                   <Input
                     value={editedName}
@@ -116,15 +184,12 @@ export function AgentModal({ agent, open, onClose, onUpdateAgent }: AgentModalPr
                 </div>
               ) : (
                 <div className="flex items-center gap-2">
-                  <DialogTitle className="text-lg">{agent.name}</DialogTitle>
+                  <DialogTitle className="text-lg">{currentAgent.name}</DialogTitle>
                   <Button
                     size="icon"
                     variant="ghost"
                     className="w-6 h-6"
-                    onClick={() => {
-                      setEditedName(agent.name);
-                      setIsEditingName(true);
-                    }}
+                    onClick={() => handleStartEditing(currentAgent)}
                   >
                     <Edit2 className="w-3 h-3" />
                   </Button>
@@ -134,10 +199,10 @@ export function AgentModal({ agent, open, onClose, onUpdateAgent }: AgentModalPr
             <div className="flex items-center gap-3">
               <div className="flex items-center gap-1.5 px-2 py-1 rounded-md bg-secondary">
                 <ModeIcon className="w-3.5 h-3.5" />
-                <span className="text-xs capitalize">{agent.mode}</span>
+                <span className="text-xs capitalize">{currentAgent.mode}</span>
               </div>
               <div className="context-indicator">
-                Context: {agent.contextLevel}%
+                Context: {currentAgent.contextLevel}%
               </div>
               <Button size="icon" variant="ghost" className="w-8 h-8" onClick={onClose}>
                 <X className="w-4 h-4" />
@@ -146,6 +211,7 @@ export function AgentModal({ agent, open, onClose, onUpdateAgent }: AgentModalPr
           </div>
         </DialogHeader>
 
+        {/* Chat Messages */}
         <ScrollArea className="flex-1 p-6">
           <div className="space-y-4">
             {messages.map(message => (
@@ -170,6 +236,7 @@ export function AgentModal({ agent, open, onClose, onUpdateAgent }: AgentModalPr
           </div>
         </ScrollArea>
 
+        {/* Input Area */}
         <div className="p-4 border-t border-border flex-shrink-0">
           <div className="flex gap-2">
             <Textarea

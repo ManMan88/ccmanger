@@ -7,7 +7,7 @@ import { AddWorktreeDialog } from '@/components/AddWorktreeDialog';
 import { SettingsDialog } from '@/components/SettingsDialog';
 import { useTheme } from '@/hooks/useTheme';
 import { useWorkspace } from '@/hooks/useWorkspace';
-import { Agent, UsageStats } from '@/types/agent';
+import { Agent, UsageStats, Worktree } from '@/types/agent';
 import { Button } from '@/components/ui/button';
 import { Plus, FolderOpen } from 'lucide-react';
 import { ScrollArea } from '@/components/ui/scroll-area';
@@ -16,17 +16,17 @@ const mockUsage: UsageStats = {
   daily: {
     used: 45000,
     limit: 100000,
-    resetTime: new Date(Date.now() + 8 * 60 * 60 * 1000), // 8 hours from now
+    resetTime: new Date(Date.now() + 8 * 60 * 60 * 1000),
   },
   weekly: {
     used: 320000,
     limit: 500000,
-    resetTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000), // 3 days from now
+    resetTime: new Date(Date.now() + 3 * 24 * 60 * 60 * 1000),
   },
   sonnetOnly: {
     used: 75000,
     limit: 150000,
-    resetTime: new Date(Date.now() + 12 * 60 * 60 * 1000), // 12 hours from now
+    resetTime: new Date(Date.now() + 12 * 60 * 60 * 1000),
   },
 };
 
@@ -43,16 +43,54 @@ const Index = () => {
     forkAgent,
     reorderAgents,
     loadPreviousAgent,
+    setSortMode,
+    reorderWorktrees,
   } = useWorkspace();
 
-  const [selectedAgent, setSelectedAgent] = useState<Agent | null>(null);
+  const [selectedWorktree, setSelectedWorktree] = useState<Worktree | null>(null);
+  const [selectedAgentId, setSelectedAgentId] = useState<string | null>(null);
   const [addWorktreeOpen, setAddWorktreeOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [draggedWorktreeId, setDraggedWorktreeId] = useState<string | null>(null);
 
   const handleOpenWorkspace = () => {
-    // In a real app, this would open a file picker
     console.log('Open workspace');
   };
+
+  const handleSelectAgent = (agent: Agent, worktree: Worktree) => {
+    setSelectedWorktree(worktree);
+    setSelectedAgentId(agent.id);
+  };
+
+  const handleWorktreeDragStart = (worktreeId: string) => {
+    setDraggedWorktreeId(worktreeId);
+  };
+
+  const handleWorktreeDragOver = (e: React.DragEvent, targetWorktreeId: string) => {
+    e.preventDefault();
+    if (!draggedWorktreeId || draggedWorktreeId === targetWorktreeId || !workspace) return;
+
+    const currentOrder = workspace.worktrees.map(wt => wt.id);
+    const draggedIndex = currentOrder.indexOf(draggedWorktreeId);
+    const targetIndex = currentOrder.indexOf(targetWorktreeId);
+
+    if (draggedIndex === -1 || targetIndex === -1) return;
+
+    const newOrder = [...currentOrder];
+    newOrder.splice(draggedIndex, 1);
+    newOrder.splice(targetIndex, 0, draggedWorktreeId);
+
+    reorderWorktrees(newOrder);
+  };
+
+  const handleWorktreeDragEnd = () => {
+    setDraggedWorktreeId(null);
+  };
+
+  // Keep selectedWorktree in sync with workspace updates
+  const currentWorktree = selectedWorktree 
+    ? workspace?.worktrees.find(wt => wt.id === selectedWorktree.id) || null
+    : null;
 
   return (
     <div className="h-screen flex flex-col bg-background">
@@ -81,13 +119,18 @@ const Index = () => {
                     updateAgent(worktree.id, agentId, updates)
                   }
                   onForkAgent={agentId => forkAgent(worktree.id, agentId)}
-                  onSelectAgent={setSelectedAgent}
+                  onSelectAgent={(agent) => handleSelectAgent(agent, worktree)}
                   onReorderAgents={agentIds => reorderAgents(worktree.id, agentIds)}
                   onRemoveWorktree={() => removeWorktree(worktree.id)}
                   onCheckoutBranch={branch => checkoutBranch(worktree.id, branch)}
                   onLoadPreviousAgent={agentId =>
                     loadPreviousAgent(worktree.id, agentId)
                   }
+                  onSetSortMode={sortMode => setSortMode(worktree.id, sortMode)}
+                  isDragging={draggedWorktreeId === worktree.id}
+                  onDragStart={() => handleWorktreeDragStart(worktree.id)}
+                  onDragOver={(e) => handleWorktreeDragOver(e, worktree.id)}
+                  onDragEnd={handleWorktreeDragEnd}
                 />
               ))}
 
@@ -123,17 +166,21 @@ const Index = () => {
       {/* Usage Bar */}
       <UsageBar stats={mockUsage} />
 
-      {/* Agent Modal */}
+      {/* Agent Modal with Tabs */}
       <AgentModal
-        agent={selectedAgent}
-        open={!!selectedAgent}
-        onClose={() => setSelectedAgent(null)}
-        onUpdateAgent={updates => {
-          if (selectedAgent) {
-            updateAgent(selectedAgent.worktreeId, selectedAgent.id, updates);
-            setSelectedAgent({ ...selectedAgent, ...updates });
+        agents={currentWorktree?.agents || []}
+        selectedAgentId={selectedAgentId}
+        open={!!selectedAgentId && !!currentWorktree}
+        onClose={() => {
+          setSelectedAgentId(null);
+          setSelectedWorktree(null);
+        }}
+        onUpdateAgent={(agentId, updates) => {
+          if (currentWorktree) {
+            updateAgent(currentWorktree.id, agentId, updates);
           }
         }}
+        onSelectAgent={setSelectedAgentId}
       />
 
       {/* Add Worktree Dialog */}

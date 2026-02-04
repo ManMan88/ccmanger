@@ -1,5 +1,5 @@
 import { useState, useCallback } from 'react';
-import { Workspace, Worktree, Agent, AgentStatus, AgentMode } from '@/types/agent';
+import { Workspace, Worktree, Agent, AgentStatus, AgentMode, AgentSortMode } from '@/types/agent';
 
 const generateId = () => Math.random().toString(36).substring(2, 9);
 
@@ -30,6 +30,8 @@ const mockWorkspace: Workspace = {
         { ...createDefaultAgent('wt1', 1), name: 'Test Writer', status: 'waiting', contextLevel: 72 },
       ],
       previousAgents: [],
+      sortMode: 'free',
+      order: 0,
     },
     {
       id: 'wt2',
@@ -42,6 +44,8 @@ const mockWorkspace: Workspace = {
       previousAgents: [
         { ...createDefaultAgent('wt2', 0), name: 'Old Agent 1', status: 'finished', contextLevel: 100 },
       ],
+      sortMode: 'free',
+      order: 1,
     },
     {
       id: 'wt3',
@@ -50,6 +54,8 @@ const mockWorkspace: Workspace = {
       path: '/Users/dev/projects/agent-master-fix',
       agents: [],
       previousAgents: [],
+      sortMode: 'free',
+      order: 2,
     },
   ],
 };
@@ -66,6 +72,8 @@ export function useWorkspace() {
       path: `${workspace.path}-${name}`,
       agents: [],
       previousAgents: [],
+      sortMode: 'free',
+      order: workspace.worktrees.length,
     };
     setWorkspace({
       ...workspace,
@@ -193,6 +201,28 @@ export function useWorkspace() {
     });
   }, [workspace]);
 
+  const setSortMode = useCallback((worktreeId: string, sortMode: AgentSortMode) => {
+    if (!workspace) return;
+    setWorkspace({
+      ...workspace,
+      worktrees: workspace.worktrees.map(wt =>
+        wt.id === worktreeId ? { ...wt, sortMode } : wt
+      ),
+    });
+  }, [workspace]);
+
+  const reorderWorktrees = useCallback((worktreeIds: string[]) => {
+    if (!workspace) return;
+    const reorderedWorktrees = worktreeIds.map((id, index) => {
+      const worktree = workspace.worktrees.find(wt => wt.id === id);
+      return worktree ? { ...worktree, order: index } : null;
+    }).filter(Boolean) as Worktree[];
+    setWorkspace({
+      ...workspace,
+      worktrees: reorderedWorktrees,
+    });
+  }, [workspace]);
+
   return {
     workspace,
     setWorkspace,
@@ -205,5 +235,7 @@ export function useWorkspace() {
     forkAgent,
     reorderAgents,
     loadPreviousAgent,
+    setSortMode,
+    reorderWorktrees,
   };
 }

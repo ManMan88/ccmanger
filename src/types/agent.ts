@@ -1,5 +1,6 @@
 export type AgentStatus = 'running' | 'waiting' | 'error' | 'finished';
 export type AgentMode = 'auto' | 'plan' | 'regular';
+export type AgentSortMode = 'free' | 'status' | 'name';
 
 export interface Agent {
   id: string;
@@ -20,6 +21,8 @@ export interface Worktree {
   path: string;
   agents: Agent[];
   previousAgents: Agent[];
+  sortMode: AgentSortMode;
+  order: number;
 }
 
 export interface Workspace {
