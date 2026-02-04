@@ -23,6 +23,7 @@ import {
   TooltipContent,
   TooltipTrigger,
 } from '@/components/ui/tooltip';
+import { Checkbox } from '@/components/ui/checkbox';
 
 interface AgentBoxProps {
   agent: Agent;
@@ -165,14 +166,32 @@ export function AgentBox({
           </DropdownMenuContent>
         </DropdownMenu>
 
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="w-7 h-7">
-              <Shield className="w-3.5 h-3.5" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Permissions</TooltipContent>
-        </Tooltip>
+        <DropdownMenu>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="icon" className="w-7 h-7">
+                  <Shield className="w-3.5 h-3.5" />
+                </Button>
+              </DropdownMenuTrigger>
+            </TooltipTrigger>
+            <TooltipContent>Permissions</TooltipContent>
+          </Tooltip>
+          <DropdownMenuContent className="bg-popover">
+            <DropdownMenuItem onClick={() => console.log('Toggle read permission')}>
+              <Checkbox checked={agent.permissions.includes('read')} className="mr-2" />
+              Read
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => console.log('Toggle write permission')}>
+              <Checkbox checked={agent.permissions.includes('write')} className="mr-2" />
+              Write
+            </DropdownMenuItem>
+            <DropdownMenuItem onClick={() => console.log('Toggle execute permission')}>
+              <Checkbox checked={agent.permissions.includes('execute')} className="mr-2" />
+              Execute
+            </DropdownMenuItem>
+          </DropdownMenuContent>
+        </DropdownMenu>
 
         <Tooltip>
           <TooltipTrigger asChild>
