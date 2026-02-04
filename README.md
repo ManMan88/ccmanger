@@ -93,31 +93,55 @@ claude_manager/
 
 The application is currently a **frontend prototype** with mock data. All state is managed client-side using React hooks. Data does not persist between sessions.
 
-### Planned Backend: Tauri
+### Planned Backend: Node.js + Fastify
 
-The recommended backend stack is **Tauri** (Rust) based on the following requirements:
+The recommended backend stack is **Node.js + TypeScript** based on the following requirements:
 
 | Requirement | Solution |
 |-------------|----------|
-| Git Operations | `git2` crate or shell commands |
-| Claude CLI Integration | Async process spawning with `tokio::process` |
-| Real-time Communication | Tauri event system (`emit`/`listen`) |
-| Data Persistence | SQLite via `sqlx` |
-| Desktop Packaging | Built-in (AppImage, .deb, .msi, .dmg) |
+| Framework | Fastify (faster than Express, excellent TS support) |
+| Git Operations | `simple-git` library |
+| Claude CLI Integration | `child_process.spawn()` with streaming |
+| Real-time Communication | WebSocket via `@fastify/websocket` |
+| Claude API | Official `@anthropic-ai/sdk` |
+| Data Persistence | SQLite via `better-sqlite3` or PostgreSQL |
 
-**Why Tauri over Electron:**
-- Lower memory footprint (~30-60MB vs 200-500MB)
-- Smaller bundle size (~5-10MB vs 150MB+)
-- Native performance for process management
-- Proven pattern in related `worktree_viewer` project
+**Why Node.js:**
+- **Shared TypeScript types** between frontend and backend
+- **Official Anthropic SDK** with streaming support
+- **React Query integration** works naturally with REST endpoints
+- **Fast iteration** - same language, instant reload
+- **Excellent WebSocket support** for real-time agent updates
+
+### Backend Architecture
+
+```
+server/
+├── src/
+│   ├── routes/
+│   │   ├── workspace.ts    # Workspace CRUD endpoints
+│   │   ├── worktree.ts     # Worktree management + git ops
+│   │   └── agent.ts        # Agent lifecycle + WebSocket
+│   ├── services/
+│   │   ├── git.ts          # Git operations (simple-git)
+│   │   ├── agent-process.ts # Claude CLI process spawning
+│   │   └── claude-api.ts   # Anthropic SDK integration
+│   ├── db/
+│   │   └── schema.ts       # Database schema
+│   └── index.ts            # Fastify server entry
+├── shared/
+│   └── types.ts            # Shared types (frontend + backend)
+└── package.json
+```
 
 ### Backend Integration Points
 
 The following hooks/components are ready for backend integration:
 
-- `useWorkspace.ts` - Replace mock data with Tauri commands
-- `AgentModal.tsx` - Connect chat interface to agent process streams
-- `WorktreeRow.tsx` - Connect git operations to Tauri commands
+- `useWorkspace.ts` - Replace mock data with React Query + REST calls
+- `AgentModal.tsx` - Connect chat interface to WebSocket streams
+- `WorktreeRow.tsx` - Connect git operations to API endpoints
+- `UsageBar.tsx` - Fetch usage stats from backend
 
 ## Usage
 

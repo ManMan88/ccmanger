@@ -103,27 +103,49 @@ interface Worktree {
 - No persistence - data lost on refresh
 - No actual Claude CLI integration
 
-### Planned Backend: Tauri (Rust)
+### Planned Backend: Node.js + Fastify
 
-Recommended stack based on related `worktree_viewer` project:
+Recommended stack for seamless TypeScript integration:
 
 ```
-src-tauri/
+server/
 ├── src/
-│   ├── commands/
-│   │   ├── agent.rs      # Claude CLI process spawning
-│   │   ├── workspace.rs  # Workspace management
-│   │   └── git.rs        # Git worktree operations
-│   └── agent/
-│       ├── process.rs    # Process lifecycle management
-│       └── store.rs      # Agent persistence (SQLite)
+│   ├── routes/
+│   │   ├── workspace.ts    # GET/POST/DELETE /api/workspace
+│   │   ├── worktree.ts     # Worktree CRUD + git operations
+│   │   └── agent.ts        # Agent lifecycle + WebSocket streaming
+│   ├── services/
+│   │   ├── git.ts          # Git operations via simple-git
+│   │   ├── agent-process.ts # Claude CLI spawning & management
+│   │   └── claude-api.ts   # Anthropic SDK for direct API calls
+│   ├── websocket/
+│   │   └── agent-stream.ts # Real-time agent output streaming
+│   ├── db/
+│   │   └── schema.ts       # SQLite/Postgres schema
+│   └── index.ts            # Fastify server entry
+├── shared/
+│   └── types.ts            # Types shared with frontend
+└── package.json
 ```
 
-Key capabilities needed:
-- **Process Management**: Spawn/stop Claude CLI agents, stream output
-- **Git Operations**: Worktree add/remove, branch checkout
-- **IPC**: Real-time bidirectional communication via Tauri events
-- **Persistence**: Store agent history, settings
+Key capabilities:
+- **Process Management**: Spawn/stop Claude CLI via `child_process.spawn()`
+- **Git Operations**: `simple-git` library for worktree add/remove, checkout
+- **Real-time**: WebSocket via `@fastify/websocket` for agent streaming
+- **Claude API**: Official `@anthropic-ai/sdk` with streaming support
+- **Persistence**: SQLite via `better-sqlite3` or PostgreSQL
+
+Backend dependencies:
+```json
+{
+  "fastify": "^4.x",
+  "@fastify/websocket": "^8.x",
+  "@anthropic-ai/sdk": "^0.x",
+  "simple-git": "^3.x",
+  "better-sqlite3": "^9.x",
+  "zod": "^3.x"
+}
+```
 
 ## Component Hierarchy
 
