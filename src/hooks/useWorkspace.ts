@@ -1,241 +1,421 @@
-import { useState, useCallback } from 'react';
-import { Workspace, Worktree, Agent, AgentStatus, AgentMode, AgentSortMode } from '@/types/agent';
+import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import {
+  api,
+  type WorkspaceWithDetails,
+  type CreateWorktreeDto,
+  type UpdateWorktreeDto,
+  type CreateAgentDto,
+  type UpdateAgentDto,
+} from '@/lib/api'
+import { queryKeys } from '@/lib/queryKeys'
+import type { Agent, Workspace, SortMode } from '@claude-manager/shared'
 
-const generateId = () => Math.random().toString(36).substring(2, 9);
+// Re-export types that components might need
+export type { WorkspaceWithDetails } from '@/lib/api'
 
-const createDefaultAgent = (worktreeId: string, order: number): Agent => ({
-  id: generateId(),
-  name: `Agent ${order + 1}`,
-  status: 'finished' as AgentStatus,
-  contextLevel: Math.floor(Math.random() * 60) + 10,
-  mode: 'regular' as AgentMode,
-  permissions: ['read', 'write'],
-  worktreeId,
-  createdAt: new Date(),
-  order,
-});
+// Adapter type to match old frontend interface
+export interface WorktreeWithAgentsCompat {
+  id: string
+  name: string
+  branch: string
+  path: string
+  agents: Agent[]
+  previousAgents: Agent[]
+  sortMode: SortMode
+  order: number
+}
 
-const mockWorkspace: Workspace = {
-  id: '1',
-  name: 'agent-master',
-  path: '/Users/dev/projects/agent-master',
-  worktrees: [
-    {
-      id: 'wt1',
-      name: 'main',
-      branch: 'main',
-      path: '/Users/dev/projects/agent-master',
-      agents: [
-        { ...createDefaultAgent('wt1', 0), name: 'Feature Builder', status: 'running', contextLevel: 45 },
-        { ...createDefaultAgent('wt1', 1), name: 'Test Writer', status: 'waiting', contextLevel: 72 },
-      ],
-      previousAgents: [],
-      sortMode: 'free',
-      order: 0,
+export interface WorkspaceCompat {
+  id: string
+  name: string
+  path: string
+  worktrees: WorktreeWithAgentsCompat[]
+}
+
+/**
+ * Transform API workspace data to the format expected by existing components
+ */
+function transformWorkspace(workspace: WorkspaceWithDetails | null): WorkspaceCompat | null {
+  if (!workspace) return null
+
+  return {
+    id: workspace.id,
+    name: workspace.name,
+    path: workspace.path,
+    worktrees: workspace.worktrees.map((wt) => ({
+      id: wt.id,
+      name: wt.name,
+      branch: wt.branch,
+      path: wt.path,
+      agents: wt.agents.map((a) => ({
+        ...a,
+        createdAt: a.createdAt,
+        order: a.displayOrder,
+      })),
+      previousAgents: wt.previousAgents.map((a) => ({
+        ...a,
+        createdAt: a.createdAt,
+        order: a.displayOrder,
+      })),
+      sortMode: wt.sortMode,
+      order: wt.displayOrder,
+    })),
+  }
+}
+
+/**
+ * Hook for listing all workspaces
+ */
+export function useWorkspaces() {
+  const queryClient = useQueryClient()
+
+  const workspacesQuery = useQuery({
+    queryKey: queryKeys.workspaces.all,
+    queryFn: () => api.workspaces.list(),
+    select: (data) => data.workspaces,
+  })
+
+  const createWorkspaceMutation = useMutation({
+    mutationFn: (path: string) => api.workspaces.create(path),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all })
     },
-    {
-      id: 'wt2',
-      name: 'feature/ui-redesign',
-      branch: 'feature/ui-redesign',
-      path: '/Users/dev/projects/agent-master-ui',
-      agents: [
-        { ...createDefaultAgent('wt2', 0), name: 'UI Agent', status: 'error', contextLevel: 88 },
-      ],
-      previousAgents: [
-        { ...createDefaultAgent('wt2', 0), name: 'Old Agent 1', status: 'finished', contextLevel: 100 },
-      ],
-      sortMode: 'free',
-      order: 1,
-    },
-    {
-      id: 'wt3',
-      name: 'fix/auth-bug',
-      branch: 'fix/auth-bug',
-      path: '/Users/dev/projects/agent-master-fix',
-      agents: [],
-      previousAgents: [],
-      sortMode: 'free',
-      order: 2,
-    },
-  ],
-};
+  })
 
-export function useWorkspace() {
-  const [workspace, setWorkspace] = useState<Workspace | null>(mockWorkspace);
+  const deleteWorkspaceMutation = useMutation({
+    mutationFn: (id: string) => api.workspaces.delete(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all })
+    },
+  })
 
-  const addWorktree = useCallback((name: string, branch: string) => {
-    if (!workspace) return;
-    const newWorktree: Worktree = {
-      id: generateId(),
-      name,
+  return {
+    workspaces: workspacesQuery.data ?? [],
+    isLoading: workspacesQuery.isLoading,
+    isError: workspacesQuery.isError,
+    error: workspacesQuery.error,
+
+    createWorkspace: createWorkspaceMutation.mutate,
+    deleteWorkspace: deleteWorkspaceMutation.mutate,
+    isCreating: createWorkspaceMutation.isPending,
+    isDeleting: deleteWorkspaceMutation.isPending,
+  }
+}
+
+/**
+ * Main hook for workspace state management (replacement for mock useWorkspace)
+ */
+export function useWorkspace(workspaceId: string | null) {
+  const queryClient = useQueryClient()
+
+  // Fetch workspace with details
+  const workspaceQuery = useQuery({
+    queryKey: workspaceId ? queryKeys.workspaces.detail(workspaceId) : ['workspaces', 'none'],
+    queryFn: () => api.workspaces.get(workspaceId!),
+    enabled: !!workspaceId,
+  })
+
+  // Add worktree mutation
+  const addWorktreeMutation = useMutation({
+    mutationFn: (data: CreateWorktreeDto) => api.worktrees.create(workspaceId!, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
+
+  // Remove worktree mutation
+  const removeWorktreeMutation = useMutation({
+    mutationFn: ({ worktreeId, force = false }: { worktreeId: string; force?: boolean }) =>
+      api.worktrees.delete(workspaceId!, worktreeId, force),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
+
+  // Checkout branch mutation
+  const checkoutBranchMutation = useMutation({
+    mutationFn: ({
+      worktreeId,
       branch,
-      path: `${workspace.path}-${name}`,
-      agents: [],
-      previousAgents: [],
-      sortMode: 'free',
-      order: workspace.worktrees.length,
-    };
-    setWorkspace({
-      ...workspace,
-      worktrees: [...workspace.worktrees, newWorktree],
-    });
-  }, [workspace]);
+      createBranch,
+    }: {
+      worktreeId: string
+      branch: string
+      createBranch?: boolean
+    }) => api.worktrees.checkout(workspaceId!, worktreeId, branch, createBranch),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
 
-  const removeWorktree = useCallback((worktreeId: string) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.filter(wt => wt.id !== worktreeId),
-    });
-  }, [workspace]);
+  // Update worktree (sort mode, order)
+  const updateWorktreeMutation = useMutation({
+    mutationFn: ({ worktreeId, ...data }: { worktreeId: string } & UpdateWorktreeDto) =>
+      api.worktrees.update(workspaceId!, worktreeId, data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
 
-  const checkoutBranch = useCallback((worktreeId: string, branch: string) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt =>
-        wt.id === worktreeId ? { ...wt, branch } : wt
-      ),
-    });
-  }, [workspace]);
+  // Reorder worktrees mutation
+  const reorderWorktreesMutation = useMutation({
+    mutationFn: (worktreeIds: string[]) => api.worktrees.reorder(workspaceId!, worktreeIds),
+    onMutate: async (worktreeIds) => {
+      // Cancel outgoing refetches
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
 
-  const addAgent = useCallback((worktreeId: string) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt => {
-        if (wt.id !== worktreeId) return wt;
-        const newAgent = createDefaultAgent(worktreeId, wt.agents.length);
-        return { ...wt, agents: [...wt.agents, newAgent] };
-      }),
-    });
-  }, [workspace]);
+      // Snapshot previous value
+      const previousWorkspace = queryClient.getQueryData<WorkspaceWithDetails>(
+        queryKeys.workspaces.detail(workspaceId!)
+      )
 
-  const removeAgent = useCallback((worktreeId: string, agentId: string) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt => {
-        if (wt.id !== worktreeId) return wt;
-        const agent = wt.agents.find(a => a.id === agentId);
-        return {
+      // Optimistically update
+      if (previousWorkspace) {
+        const reorderedWorktrees = worktreeIds.map((id, index) => {
+          const wt = previousWorkspace.worktrees.find((w) => w.id === id)!
+          return { ...wt, displayOrder: index }
+        })
+
+        queryClient.setQueryData(queryKeys.workspaces.detail(workspaceId!), {
+          ...previousWorkspace,
+          worktrees: reorderedWorktrees,
+        })
+      }
+
+      return { previousWorkspace }
+    },
+    onError: (_err, _vars, context) => {
+      // Rollback on error
+      if (context?.previousWorkspace) {
+        queryClient.setQueryData(
+          queryKeys.workspaces.detail(workspaceId!),
+          context.previousWorkspace
+        )
+      }
+    },
+  })
+
+  // Refresh workspace (re-sync with git)
+  const refreshWorkspaceMutation = useMutation({
+    mutationFn: () => api.workspaces.refresh(workspaceId!),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
+
+  // Agent mutations
+  const addAgentMutation = useMutation({
+    mutationFn: (data: CreateAgentDto) => api.agents.create(data),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
+
+  const removeAgentMutation = useMutation({
+    mutationFn: ({ agentId, archive = true }: { agentId: string; archive?: boolean }) =>
+      api.agents.delete(agentId, archive),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
+
+  const updateAgentMutation = useMutation({
+    mutationFn: ({ agentId, ...data }: { agentId: string } & UpdateAgentDto) =>
+      api.agents.update(agentId, data),
+    onMutate: async ({ agentId, ...updates }) => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+
+      const previousWorkspace = queryClient.getQueryData<WorkspaceWithDetails>(
+        queryKeys.workspaces.detail(workspaceId!)
+      )
+
+      if (previousWorkspace) {
+        const updatedWorktrees = previousWorkspace.worktrees.map((wt) => ({
           ...wt,
-          agents: wt.agents.filter(a => a.id !== agentId),
-          previousAgents: agent ? [...wt.previousAgents, { ...agent, status: 'finished' as AgentStatus }] : wt.previousAgents,
-        };
-      }),
-    });
-  }, [workspace]);
+          agents: wt.agents.map((a) => (a.id === agentId ? { ...a, ...updates } : a)),
+        }))
 
-  const updateAgent = useCallback((worktreeId: string, agentId: string, updates: Partial<Agent>) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt => {
-        if (wt.id !== worktreeId) return wt;
-        return {
-          ...wt,
-          agents: wt.agents.map(a =>
-            a.id === agentId ? { ...a, ...updates } : a
-          ),
-        };
-      }),
-    });
-  }, [workspace]);
+        queryClient.setQueryData(queryKeys.workspaces.detail(workspaceId!), {
+          ...previousWorkspace,
+          worktrees: updatedWorktrees,
+        })
+      }
 
-  const forkAgent = useCallback((worktreeId: string, agentId: string) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt => {
-        if (wt.id !== worktreeId) return wt;
-        const agent = wt.agents.find(a => a.id === agentId);
-        if (!agent) return wt;
-        const forkedAgent: Agent = {
-          ...agent,
-          id: generateId(),
-          name: `${agent.name} (fork)`,
-          order: wt.agents.length,
-          createdAt: new Date(),
-        };
-        return { ...wt, agents: [...wt.agents, forkedAgent] };
-      }),
-    });
-  }, [workspace]);
+      return { previousWorkspace }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousWorkspace) {
+        queryClient.setQueryData(
+          queryKeys.workspaces.detail(workspaceId!),
+          context.previousWorkspace
+        )
+      }
+    },
+    onSettled: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
 
-  const reorderAgents = useCallback((worktreeId: string, agentIds: string[]) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt => {
-        if (wt.id !== worktreeId) return wt;
-        const reorderedAgents = agentIds.map((id, index) => {
-          const agent = wt.agents.find(a => a.id === id);
-          return agent ? { ...agent, order: index } : null;
-        }).filter(Boolean) as Agent[];
-        return { ...wt, agents: reorderedAgents };
-      }),
-    });
-  }, [workspace]);
+  const forkAgentMutation = useMutation({
+    mutationFn: ({ agentId, name }: { agentId: string; name?: string }) =>
+      api.agents.fork(agentId, name),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
 
-  const loadPreviousAgent = useCallback((worktreeId: string, agentId: string) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt => {
-        if (wt.id !== worktreeId) return wt;
-        const agent = wt.previousAgents.find(a => a.id === agentId);
-        if (!agent) return wt;
-        const restoredAgent: Agent = {
-          ...agent,
-          id: generateId(),
-          order: wt.agents.length,
-          createdAt: new Date(),
-        };
-        return {
-          ...wt,
-          agents: [...wt.agents, restoredAgent],
-          previousAgents: wt.previousAgents.filter(a => a.id !== agentId),
-        };
-      }),
-    });
-  }, [workspace]);
+  const restoreAgentMutation = useMutation({
+    mutationFn: (agentId: string) => api.agents.restore(agentId),
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+  })
 
-  const setSortMode = useCallback((worktreeId: string, sortMode: AgentSortMode) => {
-    if (!workspace) return;
-    setWorkspace({
-      ...workspace,
-      worktrees: workspace.worktrees.map(wt =>
-        wt.id === worktreeId ? { ...wt, sortMode } : wt
-      ),
-    });
-  }, [workspace]);
+  const reorderAgentsMutation = useMutation({
+    mutationFn: ({ worktreeId, agentIds }: { worktreeId: string; agentIds: string[] }) =>
+      api.agents.reorder(worktreeId, agentIds),
+    onMutate: async ({ worktreeId, agentIds }) => {
+      await queryClient.cancelQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
 
-  const reorderWorktrees = useCallback((worktreeIds: string[]) => {
-    if (!workspace) return;
-    const reorderedWorktrees = worktreeIds.map((id, index) => {
-      const worktree = workspace.worktrees.find(wt => wt.id === id);
-      return worktree ? { ...worktree, order: index } : null;
-    }).filter(Boolean) as Worktree[];
-    setWorkspace({
-      ...workspace,
-      worktrees: reorderedWorktrees,
-    });
-  }, [workspace]);
+      const previousWorkspace = queryClient.getQueryData<WorkspaceWithDetails>(
+        queryKeys.workspaces.detail(workspaceId!)
+      )
+
+      if (previousWorkspace) {
+        const updatedWorktrees = previousWorkspace.worktrees.map((wt) => {
+          if (wt.id !== worktreeId) return wt
+
+          const reorderedAgents = agentIds.map((id, index) => {
+            const agent = wt.agents.find((a) => a.id === id)!
+            return { ...agent, displayOrder: index }
+          })
+
+          return { ...wt, agents: reorderedAgents }
+        })
+
+        queryClient.setQueryData(queryKeys.workspaces.detail(workspaceId!), {
+          ...previousWorkspace,
+          worktrees: updatedWorktrees,
+        })
+      }
+
+      return { previousWorkspace }
+    },
+    onError: (_err, _vars, context) => {
+      if (context?.previousWorkspace) {
+        queryClient.setQueryData(
+          queryKeys.workspaces.detail(workspaceId!),
+          context.previousWorkspace
+        )
+      }
+    },
+  })
+
+  // Transform workspace data to match old interface
+  const workspace = transformWorkspace(workspaceQuery.data ?? null)
+
+  // Wrapper functions to match old interface
+  const addWorktree = (name: string, branch: string) => {
+    addWorktreeMutation.mutate({ name, branch })
+  }
+
+  const removeWorktree = (worktreeId: string) => {
+    removeWorktreeMutation.mutate({ worktreeId })
+  }
+
+  const checkoutBranch = (worktreeId: string, branch: string) => {
+    checkoutBranchMutation.mutate({ worktreeId, branch })
+  }
+
+  const addAgent = (worktreeId: string) => {
+    addAgentMutation.mutate({ worktreeId })
+  }
+
+  const removeAgent = (_worktreeId: string, agentId: string) => {
+    removeAgentMutation.mutate({ agentId })
+  }
+
+  const updateAgent = (_worktreeId: string, agentId: string, updates: Partial<Agent>) => {
+    updateAgentMutation.mutate({ agentId, ...updates })
+  }
+
+  const forkAgent = (_worktreeId: string, agentId: string) => {
+    forkAgentMutation.mutate({ agentId })
+  }
+
+  const reorderAgents = (worktreeId: string, agentIds: string[]) => {
+    reorderAgentsMutation.mutate({ worktreeId, agentIds })
+  }
+
+  const loadPreviousAgent = (_worktreeId: string, agentId: string) => {
+    restoreAgentMutation.mutate(agentId)
+  }
+
+  const setSortMode = (worktreeId: string, sortMode: SortMode) => {
+    updateWorktreeMutation.mutate({ worktreeId, sortMode })
+  }
+
+  const reorderWorktrees = (worktreeIds: string[]) => {
+    reorderWorktreesMutation.mutate(worktreeIds)
+  }
 
   return {
     workspace,
-    setWorkspace,
+    isLoading: workspaceQuery.isLoading,
+    isError: workspaceQuery.isError,
+    error: workspaceQuery.error,
+
+    // Worktree operations
     addWorktree,
     removeWorktree,
     checkoutBranch,
+    setSortMode,
+    reorderWorktrees,
+
+    // Agent operations
     addAgent,
     removeAgent,
     updateAgent,
     forkAgent,
     reorderAgents,
     loadPreviousAgent,
-    setSortMode,
-    reorderWorktrees,
-  };
+
+    // Raw API data
+    workspaceData: workspaceQuery.data ?? null,
+
+    // Mutation states
+    isAddingWorktree: addWorktreeMutation.isPending,
+    isRemovingWorktree: removeWorktreeMutation.isPending,
+    isAddingAgent: addAgentMutation.isPending,
+    isRefreshing: refreshWorkspaceMutation.isPending,
+
+    // Refresh
+    refresh: refreshWorkspaceMutation.mutate,
+  }
 }

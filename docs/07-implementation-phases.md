@@ -484,95 +484,103 @@ server/tests/integration/websocket.routes.test.ts
 
 #### 4.1 API Client
 
-- [ ] Create typed API client
-- [ ] Configure base URL from environment
-- [ ] Add request/response interceptors
-- [ ] Handle authentication (if needed)
-- [ ] Add error transformation
+- [x] Create typed API client
+- [x] Configure base URL from environment
+- [x] Add request/response interceptors
+- [x] Handle authentication (if needed) - N/A for now
+- [x] Add error transformation
 
-**Deliverable:** Type-safe API client
+**Deliverable:** Type-safe API client ✅
 
 #### 4.2 React Query Integration
 
-- [ ] Configure React Query client
-- [ ] Create workspace queries
-- [ ] Create worktree queries/mutations
-- [ ] Create agent queries/mutations
-- [ ] Create usage queries
-- [ ] Add optimistic updates for mutations
+- [x] Configure React Query client
+- [x] Create workspace queries
+- [x] Create worktree queries/mutations
+- [x] Create agent queries/mutations
+- [x] Create usage queries
+- [x] Add optimistic updates for mutations
 
-**Deliverable:** Data fetching with caching
+**Deliverable:** Data fetching with caching ✅
 
 #### 4.3 Replace Mock Data
 
-- [ ] Update `useWorkspace` to use React Query
-- [ ] Replace mock workspace data
-- [ ] Replace mock agent data
-- [ ] Replace mock usage stats
-- [ ] Remove mock data files
+- [x] Update `useWorkspace` to use React Query
+- [x] Replace mock workspace data
+- [x] Replace mock agent data
+- [x] Replace mock usage stats
+- [x] Remove mock data files
 
-**Deliverable:** Frontend uses real API data
+**Deliverable:** Frontend uses real API data ✅
 
 #### 4.4 WebSocket Integration
 
-- [ ] Create WebSocket client wrapper
-- [ ] Implement auto-reconnect logic
-- [ ] Create subscription hooks
-- [ ] Integrate with React Query cache updates
-- [ ] Add connection status indicator
+- [x] Create WebSocket client wrapper
+- [x] Implement auto-reconnect logic
+- [x] Create subscription hooks
+- [x] Integrate with React Query cache updates
+- [x] Add connection status indicator
 
-**Deliverable:** Real-time updates in UI
+**Deliverable:** Real-time updates in UI ✅
 
 #### 4.5 Agent Modal Integration
 
-- [ ] Connect chat to message API
-- [ ] Stream agent output via WebSocket
-- [ ] Update agent status in real-time
-- [ ] Update context level in real-time
-- [ ] Handle connection errors gracefully
+- [x] Connect chat to message API
+- [x] Stream agent output via WebSocket
+- [x] Update agent status in real-time
+- [x] Update context level in real-time
+- [x] Handle connection errors gracefully
 
-**Deliverable:** Live agent interaction
+**Deliverable:** Live agent interaction ✅
 
 #### 4.6 Component Updates
 
-- [ ] Add loading states to components
-- [ ] Add error states/boundaries
-- [ ] Update `AgentBox` for real status
-- [ ] Update `WorktreeRow` for real data
-- [ ] Update `UsageBar` for real stats
-- [ ] Add data-testid attributes for E2E
+- [x] Add loading states to components
+- [x] Add error states/boundaries
+- [x] Update `AgentBox` for real status
+- [x] Update `WorktreeRow` for real data
+- [x] Update `UsageBar` for real stats
+- [x] Add data-testid attributes for E2E
 
-**Deliverable:** Polished component states
+**Deliverable:** Polished component states ✅
 
 ### Acceptance Criteria
 
-- [ ] App loads workspace from API
-- [ ] Creating worktree/agent calls API
-- [ ] Agent status updates in real-time
-- [ ] Chat messages appear as streamed
-- [ ] Losing connection shows indicator
-- [ ] Reconnection restores subscriptions
-- [ ] No mock data remains in codebase
+- [x] App loads workspace from API
+- [x] Creating worktree/agent calls API
+- [x] Agent status updates in real-time
+- [x] Chat messages appear as streamed
+- [x] Losing connection shows indicator
+- [x] Reconnection restores subscriptions
+- [x] No mock data remains in codebase
 
-### Files to Update
+### Files Created/Updated
 
 ```
 src/
 ├── lib/
-│   ├── api.ts           (new - API client)
-│   └── websocket.ts     (new - WS client)
+│   ├── api.ts           (NEW - API client with typed methods)
+│   ├── queryClient.ts   (NEW - React Query configuration)
+│   ├── queryKeys.ts     (NEW - Query key factory)
+│   └── websocket.ts     (NEW - WebSocket client)
 ├── hooks/
-│   ├── useWorkspace.ts  (rewrite)
-│   ├── useAgents.ts     (new)
-│   ├── useWebSocket.ts  (new)
-│   └── useUsage.ts      (new)
+│   ├── useWorkspace.ts  (REWRITTEN - React Query integration)
+│   ├── useAgents.ts     (NEW - Agent queries/mutations)
+│   ├── useWebSocket.ts  (NEW - WebSocket hooks)
+│   └── useUsage.ts      (NEW - Usage stats hooks)
 ├── components/
-│   ├── AgentBox.tsx     (update)
-│   ├── AgentModal.tsx   (update)
-│   ├── WorktreeRow.tsx  (update)
-│   └── UsageBar.tsx     (update)
-└── pages/
-    └── Index.tsx        (update)
+│   ├── AgentBox.tsx     (UPDATED - shared types, data-testid)
+│   ├── AgentModal.tsx   (UPDATED - real messages, WS subscription)
+│   ├── WorktreeRow.tsx  (UPDATED - shared types, data-testid)
+│   ├── UsageBar.tsx     (UPDATED - loading state, data-testid)
+│   └── Toolbar.tsx      (UPDATED - connection status indicator)
+├── pages/
+│   └── Index.tsx        (UPDATED - React Query hooks, WS, loading/error states)
+└── App.tsx              (UPDATED - use shared queryClient)
+
+.env.development         (NEW - API/WS URLs for development)
+.env.production          (NEW - API/WS URLs for production)
+vite.config.ts           (UPDATED - proxy configuration)
 ```
 
 ---

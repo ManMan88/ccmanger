@@ -1,6 +1,6 @@
-import { useState, useMemo } from 'react';
-import { Worktree, Agent, AgentStatus, AgentMode, AgentSortMode } from '@/types/agent';
-import { AgentBox } from './AgentBox';
+import { useState, useMemo } from 'react'
+import type { Agent, AgentStatus, AgentMode, SortMode } from '@claude-manager/shared'
+import { AgentBox } from './AgentBox'
 import {
   Plus,
   GitBranch,
@@ -10,9 +10,9 @@ import {
   MoreHorizontal,
   ArrowUpDown,
   GripVertical,
-} from 'lucide-react';
-import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area';
-import { Button } from '@/components/ui/button';
+} from 'lucide-react'
+import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
@@ -22,33 +22,45 @@ import {
   DropdownMenuRadioGroup,
   DropdownMenuRadioItem,
   DropdownMenuLabel,
-} from '@/components/ui/dropdown-menu';
+} from '@/components/ui/dropdown-menu'
 import {
   Dialog,
   DialogContent,
   DialogHeader,
   DialogTitle,
   DialogFooter,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
+} from '@/components/ui/dialog'
+import { Input } from '@/components/ui/input'
+import { Label } from '@/components/ui/label'
+
+// Worktree type compatible with both old frontend types and shared types
+interface WorktreeCompat {
+  id: string
+  name: string
+  branch: string
+  path: string
+  agents: Agent[]
+  previousAgents: Agent[]
+  sortMode: SortMode
+  order: number
+}
 
 interface WorktreeRowProps {
-  worktree: Worktree;
-  onAddAgent: () => void;
-  onRemoveAgent: (agentId: string) => void;
-  onUpdateAgent: (agentId: string, updates: Partial<Agent>) => void;
-  onForkAgent: (agentId: string) => void;
-  onSelectAgent: (agent: Agent) => void;
-  onReorderAgents: (agentIds: string[]) => void;
-  onRemoveWorktree: () => void;
-  onCheckoutBranch: (branch: string) => void;
-  onLoadPreviousAgent: (agentId: string) => void;
-  onSetSortMode: (sortMode: AgentSortMode) => void;
-  isDragging?: boolean;
-  onDragStart?: () => void;
-  onDragOver?: (e: React.DragEvent) => void;
-  onDragEnd?: () => void;
+  worktree: WorktreeCompat
+  onAddAgent: () => void
+  onRemoveAgent: (agentId: string) => void
+  onUpdateAgent: (agentId: string, updates: Partial<Agent>) => void
+  onForkAgent: (agentId: string) => void
+  onSelectAgent: (agent: Agent) => void
+  onReorderAgents: (agentIds: string[]) => void
+  onRemoveWorktree: () => void
+  onCheckoutBranch: (branch: string) => void
+  onLoadPreviousAgent: (agentId: string) => void
+  onSetSortMode: (sortMode: SortMode) => void
+  isDragging?: boolean
+  onDragStart?: () => void
+  onDragOver?: (e: React.DragEvent) => void
+  onDragEnd?: () => void
 }
 
 const statusOrder: Record<AgentStatus, number> = {
@@ -56,7 +68,7 @@ const statusOrder: Record<AgentStatus, number> = {
   waiting: 1,
   error: 2,
   finished: 3,
-};
+}
 
 export function WorktreeRow({
   worktree,
@@ -75,65 +87,66 @@ export function WorktreeRow({
   onDragOver,
   onDragEnd,
 }: WorktreeRowProps) {
-  const [draggedAgent, setDraggedAgent] = useState<string | null>(null);
-  const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false);
-  const [newBranch, setNewBranch] = useState(worktree.branch);
+  const [draggedAgent, setDraggedAgent] = useState<string | null>(null)
+  const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false)
+  const [newBranch, setNewBranch] = useState(worktree.branch)
 
   const sortedAgents = useMemo(() => {
-    const agents = [...worktree.agents];
+    const agents = [...worktree.agents]
     switch (worktree.sortMode) {
       case 'status':
-        return agents.sort((a, b) => statusOrder[a.status] - statusOrder[b.status]);
+        return agents.sort((a, b) => statusOrder[a.status] - statusOrder[b.status])
       case 'name':
-        return agents.sort((a, b) => a.name.localeCompare(b.name));
+        return agents.sort((a, b) => a.name.localeCompare(b.name))
       case 'free':
       default:
-        return agents.sort((a, b) => a.order - b.order);
+        return agents.sort((a, b) => (a.displayOrder ?? 0) - (b.displayOrder ?? 0))
     }
-  }, [worktree.agents, worktree.sortMode]);
+  }, [worktree.agents, worktree.sortMode])
 
   const handleDragStart = (agentId: string) => {
-    if (worktree.sortMode !== 'free') return;
-    setDraggedAgent(agentId);
-  };
+    if (worktree.sortMode !== 'free') return
+    setDraggedAgent(agentId)
+  }
 
   const handleDragOver = (e: React.DragEvent, targetAgentId: string) => {
-    e.preventDefault();
-    if (worktree.sortMode !== 'free') return;
-    if (!draggedAgent || draggedAgent === targetAgentId) return;
+    e.preventDefault()
+    if (worktree.sortMode !== 'free') return
+    if (!draggedAgent || draggedAgent === targetAgentId) return
 
-    const currentOrder = worktree.agents.map(a => a.id);
-    const draggedIndex = currentOrder.indexOf(draggedAgent);
-    const targetIndex = currentOrder.indexOf(targetAgentId);
+    const currentOrder = worktree.agents.map((a) => a.id)
+    const draggedIndex = currentOrder.indexOf(draggedAgent)
+    const targetIndex = currentOrder.indexOf(targetAgentId)
 
-    if (draggedIndex === -1 || targetIndex === -1) return;
+    if (draggedIndex === -1 || targetIndex === -1) return
 
-    const newOrder = [...currentOrder];
-    newOrder.splice(draggedIndex, 1);
-    newOrder.splice(targetIndex, 0, draggedAgent);
+    const newOrder = [...currentOrder]
+    newOrder.splice(draggedIndex, 1)
+    newOrder.splice(targetIndex, 0, draggedAgent)
 
-    onReorderAgents(newOrder);
-  };
+    onReorderAgents(newOrder)
+  }
 
   const handleDragEnd = () => {
-    setDraggedAgent(null);
-  };
+    setDraggedAgent(null)
+  }
 
   const handleCheckout = () => {
-    onCheckoutBranch(newBranch);
-    setCheckoutDialogOpen(false);
-  };
+    onCheckoutBranch(newBranch)
+    setCheckoutDialogOpen(false)
+  }
 
-  const sortModeLabels: Record<AgentSortMode, string> = {
+  const sortModeLabels: Record<SortMode, string> = {
     free: 'Free Arrangement',
     status: 'By Status',
     name: 'By Name',
-  };
+  }
 
   return (
     <>
-      <div 
-        className={`worktree-row animate-slide-in ${isDragging ? 'opacity-50 scale-[0.98]' : ''}`}
+      <div
+        data-testid={`worktree-row-${worktree.id}`}
+        className={`worktree-row animate-slide-in ${isDragging ? 'scale-[0.98] opacity-50' : ''}`}
         draggable
         onDragStart={onDragStart}
         onDragOver={onDragOver}
@@ -142,15 +155,13 @@ export function WorktreeRow({
         {/* Header */}
         <div className="worktree-header">
           <div className="flex items-center gap-3">
-            <div className="cursor-grab hover:bg-secondary p-1 rounded">
-              <GripVertical className="w-4 h-4 text-muted-foreground" />
+            <div className="cursor-grab rounded p-1 hover:bg-secondary">
+              <GripVertical className="h-4 w-4 text-muted-foreground" />
             </div>
-            <GitBranch className="w-4 h-4 text-muted-foreground" />
+            <GitBranch className="h-4 w-4 text-muted-foreground" />
             <div>
-              <h3 className="font-medium text-sm">{worktree.name}</h3>
-              <p className="text-xs text-muted-foreground font-mono">
-                {worktree.branch}
-              </p>
+              <h3 className="text-sm font-medium">{worktree.name}</h3>
+              <p className="font-mono text-xs text-muted-foreground">{worktree.branch}</p>
             </div>
           </div>
 
@@ -158,28 +169,27 @@ export function WorktreeRow({
             {/* Sort Mode Dropdown */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="sm" className="gap-1.5 h-8">
-                  <ArrowUpDown className="w-3.5 h-3.5" />
+                <Button
+                  variant="ghost"
+                  size="sm"
+                  className="h-8 gap-1.5"
+                  data-testid={`worktree-sort-${worktree.id}`}
+                >
+                  <ArrowUpDown className="h-3.5 w-3.5" />
                   <span className="text-xs">{sortModeLabels[worktree.sortMode]}</span>
-                  <ChevronDown className="w-3 h-3 opacity-50" />
+                  <ChevronDown className="h-3 w-3 opacity-50" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="w-48 bg-popover">
                 <DropdownMenuLabel className="text-xs">Sort Agents</DropdownMenuLabel>
                 <DropdownMenuSeparator />
-                <DropdownMenuRadioGroup 
-                  value={worktree.sortMode} 
-                  onValueChange={(value) => onSetSortMode(value as AgentSortMode)}
+                <DropdownMenuRadioGroup
+                  value={worktree.sortMode}
+                  onValueChange={(value) => onSetSortMode(value as SortMode)}
                 >
-                  <DropdownMenuRadioItem value="free">
-                    Free Arrangement
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="status">
-                    By Status
-                  </DropdownMenuRadioItem>
-                  <DropdownMenuRadioItem value="name">
-                    By Name
-                  </DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="free">Free Arrangement</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="status">By Status</DropdownMenuRadioItem>
+                  <DropdownMenuRadioItem value="name">By Name</DropdownMenuRadioItem>
                 </DropdownMenuRadioGroup>
               </DropdownMenuContent>
             </DropdownMenu>
@@ -188,23 +198,23 @@ export function WorktreeRow({
             {worktree.previousAgents.length > 0 && (
               <DropdownMenu>
                 <DropdownMenuTrigger asChild>
-                  <Button variant="ghost" size="sm" className="gap-1.5 h-8">
-                    <History className="w-3.5 h-3.5" />
+                  <Button
+                    variant="ghost"
+                    size="sm"
+                    className="h-8 gap-1.5"
+                    data-testid={`worktree-history-${worktree.id}`}
+                  >
+                    <History className="h-3.5 w-3.5" />
                     <span className="text-xs">History</span>
-                    <ChevronDown className="w-3 h-3 opacity-50" />
+                    <ChevronDown className="h-3 w-3 opacity-50" />
                   </Button>
                 </DropdownMenuTrigger>
                 <DropdownMenuContent align="end" className="w-56 bg-popover">
-                  {worktree.previousAgents.map(agent => (
-                    <DropdownMenuItem
-                      key={agent.id}
-                      onClick={() => onLoadPreviousAgent(agent.id)}
-                    >
-                      <div className="flex items-center justify-between w-full">
+                  {worktree.previousAgents.map((agent) => (
+                    <DropdownMenuItem key={agent.id} onClick={() => onLoadPreviousAgent(agent.id)}>
+                      <div className="flex w-full items-center justify-between">
                         <span className="truncate">{agent.name}</span>
-                        <span className="text-xs text-muted-foreground">
-                          {agent.contextLevel}%
-                        </span>
+                        <span className="text-xs text-muted-foreground">{agent.contextLevel}%</span>
                       </div>
                     </DropdownMenuItem>
                   ))}
@@ -216,23 +226,29 @@ export function WorktreeRow({
             <Button
               variant="secondary"
               size="sm"
-              className="gap-1.5 h-8"
+              className="h-8 gap-1.5"
               onClick={onAddAgent}
+              data-testid={`worktree-add-agent-${worktree.id}`}
             >
-              <Plus className="w-3.5 h-3.5" />
+              <Plus className="h-3.5 w-3.5" />
               <span className="text-xs">Agent</span>
             </Button>
 
             {/* More Options */}
             <DropdownMenu>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-8 h-8">
-                  <MoreHorizontal className="w-4 h-4" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8"
+                  data-testid={`worktree-more-${worktree.id}`}
+                >
+                  <MoreHorizontal className="h-4 w-4" />
                 </Button>
               </DropdownMenuTrigger>
               <DropdownMenuContent align="end" className="bg-popover">
                 <DropdownMenuItem onClick={() => setCheckoutDialogOpen(true)}>
-                  <GitBranch className="w-4 h-4 mr-2" />
+                  <GitBranch className="mr-2 h-4 w-4" />
                   Checkout branch
                 </DropdownMenuItem>
                 <DropdownMenuSeparator />
@@ -240,7 +256,7 @@ export function WorktreeRow({
                   className="text-destructive focus:text-destructive"
                   onClick={onRemoveWorktree}
                 >
-                  <Trash2 className="w-4 h-4 mr-2" />
+                  <Trash2 className="mr-2 h-4 w-4" />
                   Remove worktree
                 </DropdownMenuItem>
               </DropdownMenuContent>
@@ -251,7 +267,7 @@ export function WorktreeRow({
         {/* Agents Grid */}
         <div className="p-4">
           {worktree.agents.length === 0 ? (
-            <div className="flex items-center justify-center h-24 border-2 border-dashed border-border rounded-lg">
+            <div className="flex h-24 items-center justify-center rounded-lg border-2 border-dashed border-border">
               <p className="text-sm text-muted-foreground">
                 No agents. Click "+ Agent" to spawn one.
               </p>
@@ -259,24 +275,23 @@ export function WorktreeRow({
           ) : (
             <ScrollArea className="w-full">
               <div className="flex gap-3 pb-3">
-                {sortedAgents.map(agent => (
+                {sortedAgents.map((agent) => (
                   <div
                     key={agent.id}
                     draggable={worktree.sortMode === 'free'}
                     onDragStart={() => handleDragStart(agent.id)}
-                    onDragOver={e => handleDragOver(e, agent.id)}
+                    onDragOver={(e) => handleDragOver(e, agent.id)}
                     onDragEnd={handleDragEnd}
-                    className={`flex-shrink-0 w-56 ${worktree.sortMode !== 'free' ? 'cursor-default' : ''}`}
+                    className={`w-56 flex-shrink-0 ${worktree.sortMode !== 'free' ? 'cursor-default' : ''}`}
                   >
                     <AgentBox
                       agent={agent}
                       onSelect={() => onSelectAgent(agent)}
-                      onUpdateName={name => onUpdateAgent(agent.id, { name })}
-                      onUpdateStatus={(status: AgentStatus) =>
-                        onUpdateAgent(agent.id, { status })
-                      }
-                      onUpdateMode={(mode: AgentMode) =>
-                        onUpdateAgent(agent.id, { mode })
+                      onUpdateName={(name) => onUpdateAgent(agent.id, { name })}
+                      onUpdateStatus={(status: AgentStatus) => onUpdateAgent(agent.id, { status })}
+                      onUpdateMode={(mode: AgentMode) => onUpdateAgent(agent.id, { mode })}
+                      onUpdatePermissions={(permissions) =>
+                        onUpdateAgent(agent.id, { permissions })
                       }
                       onDelete={() => onRemoveAgent(agent.id)}
                       onFork={() => onForkAgent(agent.id)}
@@ -302,7 +317,7 @@ export function WorktreeRow({
             <Input
               id="branch"
               value={newBranch}
-              onChange={e => setNewBranch(e.target.value)}
+              onChange={(e) => setNewBranch(e.target.value)}
               className="mt-2 font-mono"
               placeholder="main"
             />
@@ -316,5 +331,5 @@ export function WorktreeRow({
         </DialogContent>
       </Dialog>
     </>
-  );
+  )
 }

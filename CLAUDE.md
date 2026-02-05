@@ -12,7 +12,7 @@ Claude Manager provides a visual interface to:
 - Configure agent modes (auto-approve/plan/regular) and permissions
 - View API usage statistics
 
-**Current State**: Frontend prototype with mock data. Backend implementation documented in `docs/`.
+**Current State**: Full-stack application with React Query, WebSocket real-time updates, and backend API integration complete (Phases 0-4). Backend running with 175+ tests passing.
 
 ## Documentation
 
@@ -37,17 +37,19 @@ Comprehensive technical documentation is available in the `docs/` directory:
 - **Framework**: React 18.3 + TypeScript
 - **Build Tool**: Vite 5.4
 - **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix primitives)
-- **State**: React hooks + React Query (installed, integration pending)
+- **State**: React Query (TanStack Query) for server state
+- **Real-time**: WebSocket client with auto-reconnect
 - **Forms**: React Hook Form + Zod validation
 - **Icons**: Lucide React
 
-### Backend (Planned)
+### Backend (Implemented)
 
 - **Runtime**: Node.js 20 LTS
 - **Framework**: Fastify 4.x
 - **Database**: SQLite (better-sqlite3)
 - **Real-time**: @fastify/websocket
 - **Git**: simple-git
+- **Process Management**: child_process for Claude CLI
 - **Validation**: Zod
 
 ## Project Structure
@@ -69,38 +71,54 @@ claude-manager/
 │   ├── pages/
 │   │   └── Index.tsx              # Main dashboard page
 │   ├── components/
-│   │   ├── Toolbar.tsx            # Top navigation bar
+│   │   ├── Toolbar.tsx            # Top navigation bar with connection status
 │   │   ├── WorktreeRow.tsx        # Worktree container with agents
 │   │   ├── AgentBox.tsx           # Individual agent card
-│   │   ├── AgentModal.tsx         # Agent interaction dialog
+│   │   ├── AgentModal.tsx         # Agent interaction dialog with real-time chat
 │   │   ├── AddWorktreeDialog.tsx
 │   │   ├── SettingsDialog.tsx
 │   │   ├── UsageBar.tsx           # API usage display
 │   │   └── ui/                    # shadcn/ui components (40+)
 │   ├── hooks/
-│   │   ├── useWorkspace.ts        # Workspace/agent state (mock data)
+│   │   ├── useWorkspace.ts        # Workspace state with React Query
+│   │   ├── useAgents.ts           # Agent queries and mutations
+│   │   ├── useUsage.ts            # Usage statistics
+│   │   ├── useWebSocket.ts        # WebSocket connection hooks
 │   │   └── useTheme.ts            # Light/dark theme toggle
-│   ├── types/
-│   │   └── agent.ts               # TypeScript interfaces
-│   └── lib/
-│       └── utils.ts               # Tailwind merge utilities
+│   ├── lib/
+│   │   ├── api.ts                 # Typed API client
+│   │   ├── queryClient.ts         # React Query configuration
+│   │   ├── queryKeys.ts           # Query key factory
+│   │   ├── websocket.ts           # WebSocket client
+│   │   └── utils.ts               # Tailwind merge utilities
+│   └── types/
+│       └── agent.ts               # Frontend-specific type aliases
 │
-├── server/                        # Backend (to be implemented)
-│   └── (see docs/01-architecture-overview.md)
+├── server/                        # Backend (implemented)
+│   ├── src/
+│   │   ├── routes/                # REST API endpoints
+│   │   ├── services/              # Business logic layer
+│   │   ├── db/                    # Database and repositories
+│   │   └── websocket/             # WebSocket handlers
+│   └── tests/                     # Unit and integration tests
 │
-└── shared/                        # Shared types (to be created)
-    └── types.ts
+└── shared/                        # Shared types package
+    └── src/index.ts               # API types and converters
 ```
 
 ## Key Frontend Files
 
-| File                             | Purpose                                                                 |
-| -------------------------------- | ----------------------------------------------------------------------- |
-| `src/hooks/useWorkspace.ts`      | State management for workspace, worktrees, agents (currently mock data) |
-| `src/types/agent.ts`             | Core type definitions: Agent, Worktree, Workspace, UsageStats           |
-| `src/components/AgentBox.tsx`    | Agent card with status, context level, mode/permission controls         |
-| `src/components/WorktreeRow.tsx` | Worktree container with drag-drop, sorting, agent management            |
-| `src/pages/Index.tsx`            | Main page orchestrating all components                                  |
+| File                             | Purpose                                                          |
+| -------------------------------- | ---------------------------------------------------------------- |
+| `src/lib/api.ts`                 | Typed API client for all REST endpoints                          |
+| `src/lib/websocket.ts`           | WebSocket client with auto-reconnect and subscription management |
+| `src/hooks/useWorkspace.ts`      | React Query hooks for workspace state management                 |
+| `src/hooks/useAgents.ts`         | React Query hooks for agent CRUD and process control             |
+| `src/hooks/useWebSocket.ts`      | Hooks for WebSocket connection and subscriptions                 |
+| `src/components/AgentBox.tsx`    | Agent card with status, context level, mode/permission controls  |
+| `src/components/AgentModal.tsx`  | Agent interaction dialog with real-time message streaming        |
+| `src/components/WorktreeRow.tsx` | Worktree container with drag-drop, sorting, agent management     |
+| `src/pages/Index.tsx`            | Main page with loading/error states and WebSocket integration    |
 
 ## Development Commands
 
@@ -181,30 +199,36 @@ See [docs/01-architecture-overview.md](docs/01-architecture-overview.md) for det
 
 ## Implementation Status
 
-| Component                      | Status         | Documentation                                        |
-| ------------------------------ | -------------- | ---------------------------------------------------- |
-| Frontend UI                    | ✅ Complete    | -                                                    |
-| Frontend State (mock)          | ✅ Complete    | -                                                    |
-| Backend API (Phase 0-1)        | ✅ Complete    | [API Spec](docs/02-api-specification.md)             |
-| Database                       | ✅ Complete    | [Schema](docs/03-database-schema.md)                 |
-| Process Management (Phase 2)   | ✅ Complete    | [Implementation](docs/04-backend-implementation.md)  |
-| WebSocket (Phase 3)            | ✅ Complete    | [API Spec](docs/02-api-specification.md)             |
-| Frontend Integration (Phase 4) | ⏳ Planned     | [Integration Guide](docs/08-frontend-integration.md) |
-| CI/CD                          | ✅ Complete    | [Pipeline](docs/06-ci-cd-pipeline.md)                |
-| Testing                        | ✅ In Progress | [Strategy](docs/05-testing-strategy.md)              |
+| Component                      | Status      | Documentation                                        |
+| ------------------------------ | ----------- | ---------------------------------------------------- |
+| Frontend UI                    | ✅ Complete | -                                                    |
+| Frontend Integration (Phase 4) | ✅ Complete | [Integration Guide](docs/08-frontend-integration.md) |
+| Backend API (Phase 0-1)        | ✅ Complete | [API Spec](docs/02-api-specification.md)             |
+| Database                       | ✅ Complete | [Schema](docs/03-database-schema.md)                 |
+| Process Management (Phase 2)   | ✅ Complete | [Implementation](docs/04-backend-implementation.md)  |
+| WebSocket (Phase 3)            | ✅ Complete | [API Spec](docs/02-api-specification.md)             |
+| CI/CD                          | ✅ Complete | [Pipeline](docs/06-ci-cd-pipeline.md)                |
+| Testing                        | ✅ Complete | [Strategy](docs/05-testing-strategy.md)              |
 
 **Backend Test Coverage:** 175 tests passing (unit + integration)
+
+### Phase 4 Integration Details
+
+- **API Client**: Typed client with error handling in `src/lib/api.ts`
+- **React Query**: Full integration with optimistic updates and cache invalidation
+- **WebSocket**: Auto-reconnect, subscriptions, real-time cache updates
+- **Components**: Loading states, error boundaries, data-testid attributes
 
 ## Component Hierarchy
 
 ```
 App (QueryClient, Router, Tooltips)
-└── Index (useWorkspace, useTheme)
-    ├── Toolbar (theme toggle, workspace selector)
+└── Index (useWorkspace, useUsage, useWebSocket)
+    ├── Toolbar (theme toggle, workspace selector, connection status)
     ├── WorktreeRow[] (per worktree)
-    │   └── AgentBox[] (draggable agent cards)
-    ├── UsageBar (API usage stats)
-    ├── AgentModal (agent chat interface)
+    │   └── AgentBox[] (draggable agent cards with real-time status)
+    ├── UsageBar (real-time API usage stats)
+    ├── AgentModal (agent chat with message streaming)
     ├── AddWorktreeDialog
     └── SettingsDialog
 ```

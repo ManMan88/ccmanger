@@ -1,8 +1,7 @@
-import { useMemo } from 'react';
-import { Agent, AgentStatus, AgentMode } from '@/types/agent';
+import { useMemo } from 'react'
+import type { Agent, AgentStatus, AgentMode } from '@claude-manager/shared'
 import {
   Play,
-  Pause,
   Trash2,
   GitFork,
   Shield,
@@ -10,30 +9,30 @@ import {
   ClipboardList,
   Settings2,
   GripVertical,
-} from 'lucide-react';
-import { Button } from '@/components/ui/button';
+  Square,
+} from 'lucide-react'
+import { Button } from '@/components/ui/button'
 import {
   DropdownMenu,
   DropdownMenuContent,
   DropdownMenuItem,
   DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu';
-import {
-  Tooltip,
-  TooltipContent,
-  TooltipTrigger,
-} from '@/components/ui/tooltip';
-import { Checkbox } from '@/components/ui/checkbox';
+} from '@/components/ui/dropdown-menu'
+import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
+import { Checkbox } from '@/components/ui/checkbox'
 
 interface AgentBoxProps {
-  agent: Agent;
-  onSelect: () => void;
-  onUpdateName: (name: string) => void;
-  onUpdateStatus: (status: AgentStatus) => void;
-  onUpdateMode: (mode: AgentMode) => void;
-  onDelete: () => void;
-  onFork: () => void;
-  isDragging?: boolean;
+  agent: Agent
+  onSelect: () => void
+  onUpdateName: (name: string) => void
+  onUpdateStatus: (status: AgentStatus) => void
+  onUpdateMode: (mode: AgentMode) => void
+  onUpdatePermissions?: (permissions: string[]) => void
+  onDelete: () => void
+  onFork: () => void
+  onStart?: () => void
+  onStop?: () => void
+  isDragging?: boolean
 }
 
 const statusClasses: Record<AgentStatus, string> = {
@@ -41,87 +40,118 @@ const statusClasses: Record<AgentStatus, string> = {
   waiting: 'agent-box-waiting',
   error: 'agent-box-error',
   finished: 'agent-box-finished',
-};
+}
 
 const statusLabels: Record<AgentStatus, string> = {
   running: 'Running',
   waiting: 'Waiting for input',
   error: 'Error',
   finished: 'Finished',
-};
+}
 
 const modeIcons: Record<AgentMode, typeof Zap> = {
   auto: Zap,
   plan: ClipboardList,
   regular: Settings2,
-};
+}
 
 const modeLabels: Record<AgentMode, string> = {
   auto: 'Auto Approve',
   plan: 'Plan Mode',
   regular: 'Regular Mode',
-};
+}
 
 export function AgentBox({
   agent,
   onSelect,
   onUpdateStatus,
   onUpdateMode,
+  onUpdatePermissions,
   onDelete,
   onFork,
+  onStart,
+  onStop,
   isDragging,
 }: AgentBoxProps) {
-  const ModeIcon = modeIcons[agent.mode];
+  const ModeIcon = modeIcons[agent.mode]
 
   const contextColor = useMemo(() => {
-    if (agent.contextLevel >= 80) return 'text-status-error';
-    if (agent.contextLevel >= 60) return 'text-status-waiting';
-    return 'text-muted-foreground';
-  }, [agent.contextLevel]);
+    if (agent.contextLevel >= 80) return 'text-status-error'
+    if (agent.contextLevel >= 60) return 'text-status-waiting'
+    return 'text-muted-foreground'
+  }, [agent.contextLevel])
+
+  const handlePermissionToggle = (permission: string) => {
+    if (!onUpdatePermissions) return
+    const newPermissions = agent.permissions.includes(permission)
+      ? agent.permissions.filter((p) => p !== permission)
+      : [...agent.permissions, permission]
+    onUpdatePermissions(newPermissions)
+  }
+
+  const handlePlayPause = () => {
+    if (agent.status === 'running') {
+      if (onStop) {
+        onStop()
+      } else {
+        onUpdateStatus('waiting')
+      }
+    } else if (agent.status !== 'finished') {
+      if (onStart && agent.status !== 'waiting') {
+        onStart()
+      } else {
+        onUpdateStatus('running')
+      }
+    }
+  }
 
   return (
     <div
-      className={`agent-box ${statusClasses[agent.status]} ${isDragging ? 'opacity-50 scale-95' : ''}`}
+      data-testid={`agent-box-${agent.id}`}
+      className={`agent-box ${statusClasses[agent.status]} ${isDragging ? 'scale-95 opacity-50' : ''}`}
       onClick={onSelect}
     >
       {/* Drag Handle */}
-      <div className="absolute left-1 top-1/2 -translate-y-1/2 opacity-40 hover:opacity-100 cursor-grab">
-        <GripVertical className="w-4 h-4" />
+      <div className="absolute left-1 top-1/2 -translate-y-1/2 cursor-grab opacity-40 hover:opacity-100">
+        <GripVertical className="h-4 w-4" />
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between mb-2 pl-4">
+      <div className="mb-2 flex items-center justify-between pl-4">
         <div className="flex items-center gap-2">
-          <div className={`status-dot status-dot-${agent.status}`} />
-          <span className="font-medium text-sm truncate max-w-[120px]">
-            {agent.name}
-          </span>
+          <div
+            data-testid={`agent-status-${agent.id}`}
+            className={`status-dot status-dot-${agent.status}`}
+          />
+          <span className="max-w-[120px] truncate text-sm font-medium">{agent.name}</span>
         </div>
-        <span className={`context-indicator ${contextColor}`}>
+        <span
+          data-testid={`agent-context-${agent.id}`}
+          className={`context-indicator ${contextColor}`}
+        >
           {agent.contextLevel}%
         </span>
       </div>
 
       {/* Status Label */}
-      <p className="text-xs text-muted-foreground mb-3 pl-4">
-        {statusLabels[agent.status]}
-      </p>
+      <p className="mb-3 pl-4 text-xs text-muted-foreground">{statusLabels[agent.status]}</p>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 pl-4" onClick={e => e.stopPropagation()}>
+      <div className="flex items-center gap-1 pl-4" onClick={(e) => e.stopPropagation()}>
         {agent.status === 'running' ? (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
                 variant="ghost"
                 size="icon"
-                className="w-7 h-7"
-                onClick={() => onUpdateStatus('waiting')}
+                className="h-7 w-7"
+                onClick={handlePlayPause}
+                data-testid={`agent-pause-${agent.id}`}
               >
-                <Pause className="w-3.5 h-3.5" />
+                <Square className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Pause</TooltipContent>
+            <TooltipContent>Stop</TooltipContent>
           </Tooltip>
         ) : agent.status !== 'finished' ? (
           <Tooltip>
@@ -129,13 +159,14 @@ export function AgentBox({
               <Button
                 variant="ghost"
                 size="icon"
-                className="w-7 h-7"
-                onClick={() => onUpdateStatus('running')}
+                className="h-7 w-7"
+                onClick={handlePlayPause}
+                data-testid={`agent-play-${agent.id}`}
               >
-                <Play className="w-3.5 h-3.5" />
+                <Play className="h-3.5 w-3.5" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>Resume</TooltipContent>
+            <TooltipContent>{agent.status === 'waiting' ? 'Resume' : 'Start'}</TooltipContent>
           </Tooltip>
         ) : null}
 
@@ -143,8 +174,13 @@ export function AgentBox({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-7 h-7">
-                  <ModeIcon className="w-3.5 h-3.5" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  data-testid={`agent-mode-${agent.id}`}
+                >
+                  <ModeIcon className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
@@ -152,15 +188,15 @@ export function AgentBox({
           </Tooltip>
           <DropdownMenuContent className="bg-popover">
             <DropdownMenuItem onClick={() => onUpdateMode('auto')}>
-              <Zap className="w-4 h-4 mr-2" />
+              <Zap className="mr-2 h-4 w-4" />
               Auto Approve
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onUpdateMode('plan')}>
-              <ClipboardList className="w-4 h-4 mr-2" />
+              <ClipboardList className="mr-2 h-4 w-4" />
               Plan Mode
             </DropdownMenuItem>
             <DropdownMenuItem onClick={() => onUpdateMode('regular')}>
-              <Settings2 className="w-4 h-4 mr-2" />
+              <Settings2 className="mr-2 h-4 w-4" />
               Regular Mode
             </DropdownMenuItem>
           </DropdownMenuContent>
@@ -170,23 +206,28 @@ export function AgentBox({
           <Tooltip>
             <TooltipTrigger asChild>
               <DropdownMenuTrigger asChild>
-                <Button variant="ghost" size="icon" className="w-7 h-7">
-                  <Shield className="w-3.5 h-3.5" />
+                <Button
+                  variant="ghost"
+                  size="icon"
+                  className="h-7 w-7"
+                  data-testid={`agent-permissions-${agent.id}`}
+                >
+                  <Shield className="h-3.5 w-3.5" />
                 </Button>
               </DropdownMenuTrigger>
             </TooltipTrigger>
             <TooltipContent>Permissions</TooltipContent>
           </Tooltip>
           <DropdownMenuContent className="bg-popover">
-            <DropdownMenuItem onClick={() => console.log('Toggle read permission')}>
+            <DropdownMenuItem onClick={() => handlePermissionToggle('read')}>
               <Checkbox checked={agent.permissions.includes('read')} className="mr-2" />
               Read
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => console.log('Toggle write permission')}>
+            <DropdownMenuItem onClick={() => handlePermissionToggle('write')}>
               <Checkbox checked={agent.permissions.includes('write')} className="mr-2" />
               Write
             </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => console.log('Toggle execute permission')}>
+            <DropdownMenuItem onClick={() => handlePermissionToggle('execute')}>
               <Checkbox checked={agent.permissions.includes('execute')} className="mr-2" />
               Execute
             </DropdownMenuItem>
@@ -195,8 +236,14 @@ export function AgentBox({
 
         <Tooltip>
           <TooltipTrigger asChild>
-            <Button variant="ghost" size="icon" className="w-7 h-7" onClick={onFork}>
-              <GitFork className="w-3.5 h-3.5" />
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-7 w-7"
+              onClick={onFork}
+              data-testid={`agent-fork-${agent.id}`}
+            >
+              <GitFork className="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Fork</TooltipContent>
@@ -207,15 +254,16 @@ export function AgentBox({
             <Button
               variant="ghost"
               size="icon"
-              className="w-7 h-7 text-destructive hover:text-destructive"
+              className="h-7 w-7 text-destructive hover:text-destructive"
               onClick={onDelete}
+              data-testid={`agent-delete-${agent.id}`}
             >
-              <Trash2 className="w-3.5 h-3.5" />
+              <Trash2 className="h-3.5 w-3.5" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Delete</TooltipContent>
         </Tooltip>
       </div>
     </div>
-  );
+  )
 }
