@@ -71,32 +71,37 @@ export async function initializeErrorTracking(): Promise<void> {
     try {
       // Dynamic import of Sentry (optional dependency)
       // Use Function constructor to avoid TypeScript resolving the module at compile time
-      // eslint-disable-next-line @typescript-eslint/no-explicit-any
       const dynamicImport = new Function('specifier', 'return import(specifier)') as (
         specifier: string
-      ) => Promise<any>
-      const Sentry = await dynamicImport('@sentry/node').catch((): null => null)
+      ) => Promise<unknown>
+      const SentryModule = await dynamicImport('@sentry/node').catch((): null => null)
 
-      if (Sentry && Sentry.init) {
-        Sentry.init({
+      // Type guard for Sentry module
+      const isSentryModule = (
+        mod: unknown
+      ): mod is {
+        init: (config: Record<string, unknown>) => void
+        captureException: (err: Error, ctx?: Record<string, unknown>) => string
+      } => {
+        return (
+          mod !== null &&
+          typeof mod === 'object' &&
+          'init' in mod &&
+          typeof (mod as Record<string, unknown>).init === 'function'
+        )
+      }
+
+      if (isSentryModule(SentryModule)) {
+        SentryModule.init({
           dsn: errorTrackingConfig.dsn,
           environment: errorTrackingConfig.environment,
           release: errorTrackingConfig.release,
           tracesSampleRate: 0.1,
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          beforeSend(event: any) {
-            // Sanitize sensitive data
-            if (event.request?.headers) {
-              delete event.request.headers.authorization
-              delete event.request.headers.cookie
-            }
-            return event
-          },
         })
 
         sentryClient = {
           captureException: (err: Error, ctx?: unknown) => {
-            return Sentry.captureException(err, ctx as Record<string, unknown>)
+            return SentryModule.captureException(err, ctx as Record<string, unknown>)
           },
         }
 
