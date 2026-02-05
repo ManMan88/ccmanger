@@ -106,13 +106,25 @@ export function AgentBox({
   }
 
   return (
-    <div
+    <article
       data-testid={`agent-box-${agent.id}`}
       className={`agent-box ${statusClasses[agent.status]} ${isDragging ? 'scale-95 opacity-50' : ''}`}
       onClick={onSelect}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter' || e.key === ' ') {
+          e.preventDefault()
+          onSelect()
+        }
+      }}
+      tabIndex={0}
+      role="button"
+      aria-label={`${agent.name} agent, status: ${statusLabels[agent.status]}, context: ${agent.contextLevel}%`}
     >
       {/* Drag Handle */}
-      <div className="absolute left-1 top-1/2 -translate-y-1/2 cursor-grab opacity-40 hover:opacity-100">
+      <div
+        className="absolute left-1 top-1/2 -translate-y-1/2 cursor-grab opacity-40 hover:opacity-100"
+        aria-hidden="true"
+      >
         <GripVertical className="h-4 w-4" />
       </div>
 
@@ -137,7 +149,12 @@ export function AgentBox({
       <p className="mb-3 pl-4 text-xs text-muted-foreground">{statusLabels[agent.status]}</p>
 
       {/* Actions */}
-      <div className="flex items-center gap-1 pl-4" onClick={(e) => e.stopPropagation()}>
+      <div
+        className="flex items-center gap-1 pl-4"
+        onClick={(e) => e.stopPropagation()}
+        role="toolbar"
+        aria-label={`Actions for ${agent.name}`}
+      >
         {agent.status === 'running' ? (
           <Tooltip>
             <TooltipTrigger asChild>
@@ -147,8 +164,9 @@ export function AgentBox({
                 className="h-7 w-7"
                 onClick={handlePlayPause}
                 data-testid={`agent-pause-${agent.id}`}
+                aria-label="Stop agent"
               >
-                <Square className="h-3.5 w-3.5" />
+                <Square className="h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>Stop</TooltipContent>
@@ -162,8 +180,9 @@ export function AgentBox({
                 className="h-7 w-7"
                 onClick={handlePlayPause}
                 data-testid={`agent-play-${agent.id}`}
+                aria-label={agent.status === 'waiting' ? 'Resume agent' : 'Start agent'}
               >
-                <Play className="h-3.5 w-3.5" />
+                <Play className="h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
             <TooltipContent>{agent.status === 'waiting' ? 'Resume' : 'Start'}</TooltipContent>
@@ -242,8 +261,9 @@ export function AgentBox({
               className="h-7 w-7"
               onClick={onFork}
               data-testid={`agent-fork-${agent.id}`}
+              aria-label="Fork agent"
             >
-              <GitFork className="h-3.5 w-3.5" />
+              <GitFork className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Fork</TooltipContent>
@@ -257,13 +277,14 @@ export function AgentBox({
               className="h-7 w-7 text-destructive hover:text-destructive"
               onClick={onDelete}
               data-testid={`agent-delete-${agent.id}`}
+              aria-label="Delete agent"
             >
-              <Trash2 className="h-3.5 w-3.5" />
+              <Trash2 className="h-3.5 w-3.5" aria-hidden="true" />
             </Button>
           </TooltipTrigger>
           <TooltipContent>Delete</TooltipContent>
         </Tooltip>
       </div>
-    </div>
+    </article>
   )
 }
