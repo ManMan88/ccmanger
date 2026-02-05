@@ -317,7 +317,7 @@ main() {
                 mv server-package.json server/package.json
                 mv server-dist server/dist
             fi
-            pnpm install --prod --frozen-lockfile 2>/dev/null || npm install --production
+            pnpm install --prod --no-frozen-lockfile --ignore-scripts || npm install --production --ignore-scripts
         fi
     else
         install_from_source

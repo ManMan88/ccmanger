@@ -30,7 +30,7 @@
     "migrate": "pnpm --filter @claude-manager/server migrate",
     "format": "prettier --write .",
     "format:check": "prettier --check .",
-    "prepare": "husky"
+    "prepare": "husky || true"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.10.0",
