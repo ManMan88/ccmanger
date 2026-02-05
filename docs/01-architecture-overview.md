@@ -78,50 +78,57 @@ Claude Manager is a GUI application for managing Claude Code CLI agents across g
 ## Technology Stack
 
 ### Backend Core
-| Component | Technology | Version | Purpose |
-|-----------|------------|---------|---------|
-| Runtime | Node.js | 20 LTS | JavaScript runtime |
-| Language | TypeScript | 5.x | Type safety |
-| Framework | Fastify | 4.x | HTTP server |
-| WebSocket | @fastify/websocket | 8.x | Real-time communication |
-| Validation | Zod | 3.x | Schema validation |
+
+| Component  | Technology         | Version | Purpose                 |
+| ---------- | ------------------ | ------- | ----------------------- |
+| Runtime    | Node.js            | 20 LTS  | JavaScript runtime      |
+| Language   | TypeScript         | 5.x     | Type safety             |
+| Framework  | Fastify            | 4.x     | HTTP server             |
+| WebSocket  | @fastify/websocket | 8.x     | Real-time communication |
+| Validation | Zod                | 3.x     | Schema validation       |
 
 ### Data & Storage
-| Component | Technology | Version | Purpose |
-|-----------|------------|---------|---------|
-| Database | SQLite | 3.x | Persistent storage |
-| DB Client | better-sqlite3 | 9.x | Synchronous SQLite |
-| Migrations | Custom | - | Schema versioning |
-| File Storage | Node fs | - | Logs, configs |
+
+| Component    | Technology     | Version | Purpose            |
+| ------------ | -------------- | ------- | ------------------ |
+| Database     | SQLite         | 3.x     | Persistent storage |
+| DB Client    | better-sqlite3 | 9.x     | Synchronous SQLite |
+| Migrations   | Custom         | -       | Schema versioning  |
+| File Storage | Node fs        | -       | Logs, configs      |
 
 ### Git & Process Management
-| Component | Technology | Version | Purpose |
-|-----------|------------|---------|---------|
-| Git Operations | simple-git | 3.x | Git command wrapper |
-| Process Management | Node child_process | - | Spawn Claude CLI |
-| PTY Support | node-pty | 1.x | Terminal emulation |
+
+| Component          | Technology         | Version | Purpose             |
+| ------------------ | ------------------ | ------- | ------------------- |
+| Git Operations     | simple-git         | 3.x     | Git command wrapper |
+| Process Management | Node child_process | -       | Spawn Claude CLI    |
+| PTY Support        | node-pty           | 1.x     | Terminal emulation  |
 
 ### Claude Integration
-| Component | Technology | Version | Purpose |
-|-----------|------------|---------|---------|
-| CLI | claude-code | latest | Primary agent runner |
-| API SDK | @anthropic-ai/sdk | 0.x | Direct API (optional) |
+
+| Component | Technology        | Version | Purpose               |
+| --------- | ----------------- | ------- | --------------------- |
+| CLI       | claude-code       | latest  | Primary agent runner  |
+| API SDK   | @anthropic-ai/sdk | 0.x     | Direct API (optional) |
 
 ### Testing & Quality
-| Component | Technology | Version | Purpose |
-|-----------|------------|---------|---------|
-| Test Runner | Vitest | 3.x | Unit & integration tests |
-| HTTP Testing | Supertest | 6.x | API testing |
-| Mocking | Vitest mocks | - | Dependency mocking |
-| Coverage | c8 | 8.x | Code coverage |
+
+| Component    | Technology   | Version | Purpose                  |
+| ------------ | ------------ | ------- | ------------------------ |
+| Test Runner  | Vitest       | 3.x     | Unit & integration tests |
+| HTTP Testing | Supertest    | 6.x     | API testing              |
+| Mocking      | Vitest mocks | -       | Dependency mocking       |
+| Coverage     | c8           | 8.x     | Code coverage            |
 
 ### DevOps
-| Component | Technology | Purpose |
-|-----------|------------|---------|
-| CI/CD | GitHub Actions | Automated testing/deployment |
-| Linting | ESLint + Prettier | Code quality |
-| Container | Docker | Deployment packaging |
-| Process Manager | PM2 | Production process management |
+
+| Component       | Technology        | Purpose                       |
+| --------------- | ----------------- | ----------------------------- |
+| CI/CD           | GitHub Actions    | Automated testing/deployment  |
+| Linting         | ESLint + Prettier | Code quality                  |
+| Process Manager | PM2               | Production process management |
+
+> **Note:** Claude Manager uses native deployment (no Docker) because it requires direct access to local git repositories, the Claude Code CLI, and file system operations.
 
 ## Directory Structure
 
@@ -201,20 +208,17 @@ claude-manager/
 │       ├── cd.yml                # Continuous deployment
 │       └── test.yml              # Test workflow
 │
-├── docker/
-│   ├── Dockerfile.server         # Backend container
-│   ├── Dockerfile.frontend       # Frontend container
-│   └── docker-compose.yml        # Full stack compose
-│
 └── scripts/
-    ├── setup.sh                  # Development setup
-    ├── migrate.ts                # Database migrations
-    └── seed.ts                   # Test data seeding
+    ├── start-dev.sh              # Development startup
+    ├── start-prod.sh             # Production startup
+    ├── build.sh                  # Production build
+    └── setup.sh                  # Initial setup
 ```
 
 ## Core Design Patterns
 
 ### 1. Repository Pattern
+
 Data access is abstracted through repository classes, isolating database operations from business logic.
 
 ```typescript
@@ -229,6 +233,7 @@ interface AgentRepository {
 ```
 
 ### 2. Service Layer Pattern
+
 Business logic resides in service classes, keeping routes thin and testable.
 
 ```typescript
@@ -247,6 +252,7 @@ class AgentService {
 ```
 
 ### 3. Event-Driven Architecture
+
 Process events are handled through an event emitter for loose coupling.
 
 ```typescript
@@ -258,6 +264,7 @@ agentManager.on('agent:exit', (agentId, code) => {})
 ```
 
 ### 4. WebSocket Pub/Sub
+
 Real-time updates use a pub/sub model for scalable client communication.
 
 ```typescript
@@ -337,21 +344,25 @@ Real-time updates use a pub/sub model for scalable client communication.
 ## Security Considerations
 
 ### 1. Process Isolation
+
 - Each Claude CLI process runs with restricted permissions
 - Agents cannot access files outside their worktree
 - Process resource limits (memory, CPU time)
 
 ### 2. Input Validation
+
 - All API inputs validated with Zod schemas
 - Path traversal prevention for file operations
 - Command injection prevention for git operations
 
 ### 3. Authentication (Future)
+
 - Local-only by default (no auth required)
 - Optional API key authentication for remote access
 - Session-based auth for multi-user scenarios
 
 ### 4. Data Protection
+
 - SQLite database file permissions (600)
 - No sensitive data in logs
 - Secure credential storage for API keys
@@ -359,18 +370,21 @@ Real-time updates use a pub/sub model for scalable client communication.
 ## Performance Considerations
 
 ### 1. Database
+
 - SQLite for simplicity and performance
 - Synchronous operations (better-sqlite3)
 - Indexed queries on frequently accessed fields
 - Connection pooling not needed (single process)
 
 ### 2. Process Management
+
 - Lazy process spawning (on-demand)
 - Process pooling for frequent operations
 - Output buffering to reduce WebSocket messages
 - Memory-mapped I/O for large outputs
 
 ### 3. WebSocket
+
 - Message batching for high-frequency updates
 - Heartbeat/ping-pong for connection health
 - Automatic reconnection handling
@@ -379,16 +393,18 @@ Real-time updates use a pub/sub model for scalable client communication.
 ## Scalability Notes
 
 ### Current Scope (Single User)
+
 - Single process Node.js server
 - SQLite database
 - Local file system
 - Local git repositories
 
 ### Future Expansion (Multi-User)
+
 - PostgreSQL for multi-process support
 - Redis for pub/sub and caching
 - S3/MinIO for log storage
-- Kubernetes for container orchestration
+- Multi-machine deployment with shared storage
 
 ## Related Documents
 

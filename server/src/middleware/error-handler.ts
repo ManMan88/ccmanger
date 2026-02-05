@@ -2,6 +2,7 @@ import type { FastifyError, FastifyReply, FastifyRequest } from 'fastify'
 import { ZodError } from 'zod'
 import { AppError, isAppError } from '../utils/errors.js'
 import { logger } from '../utils/logger.js'
+import { captureError } from '../services/error-tracking.service.js'
 
 interface ErrorResponse {
   error: {
@@ -73,8 +74,17 @@ export function errorHandler(
     return
   }
 
-  // Unknown errors
-  logger.error({ error, requestId: request.id }, 'Unhandled error')
+  // Unknown errors - capture for error tracking
+  const errorId = captureError(error instanceof Error ? error : new Error(String(error)), {
+    requestId: request.id,
+    operation: `${request.method} ${request.url}`,
+    extra: {
+      headers: request.headers,
+      query: request.query,
+    },
+  })
+
+  logger.error({ error, requestId: request.id, errorId }, 'Unhandled error')
 
   const response: ErrorResponse = {
     error: {

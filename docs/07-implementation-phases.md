@@ -675,59 +675,92 @@ package.json                       (UPDATED - E2E test scripts)
 
 ### Objectives
 
-- Prepare for production deployment
+- Prepare for native production deployment (no Docker - requires local filesystem access)
 - Complete documentation
-- Set up monitoring
+- Set up monitoring and release process
 
 ### Tasks
 
-#### 6.1 Production Configuration
+#### 6.1 Production Build & Configuration
 
-- [ ] Create production Dockerfile
-- [ ] Set up docker-compose for deployment
-- [ ] Configure production environment variables
-- [ ] Set up HTTPS/TLS (if applicable)
-- [ ] Configure CORS for production
+- [x] Create production build scripts (frontend + backend)
+- [x] Configure production environment variables
+- [x] Set up process manager (PM2) for backend server
+- [x] Create startup scripts for development and production
+- [x] Add graceful shutdown and restart handling (already implemented in Phase 2)
 
-**Deliverable:** Deployable containers
+**Deliverable:** Production-ready native deployment ✅
 
 #### 6.2 Documentation
 
-- [ ] Update README with installation
-- [ ] Write user guide
-- [ ] Document API (OpenAPI/Swagger)
-- [ ] Add inline code documentation
-- [ ] Create troubleshooting guide
+- [x] Update README with installation and quick start
+- [x] Write user guide (basic usage workflow)
+- [x] Document API (OpenAPI/Swagger spec)
+- [x] Create troubleshooting guide
+- [x] Add configuration reference
 
-**Deliverable:** Complete documentation
+**Deliverable:** Complete documentation ✅
 
 #### 6.3 Monitoring & Logging
 
-- [ ] Add structured logging
-- [ ] Create health check endpoints
-- [ ] Add metrics collection (optional)
-- [ ] Set up error tracking (optional)
-- [ ] Create runbook for common issues
+- [x] Enhance structured logging (Pino configuration - already implemented)
+- [x] Verify health check endpoints work correctly (already implemented)
+- [x] Add application metrics endpoint
+- [x] Add error tracking service
+- [x] Create runbook for common issues (troubleshooting.md)
+- [x] Add log rotation configuration
 
-**Deliverable:** Observable application
+**Deliverable:** Observable application ✅
 
 #### 6.4 Release Process
 
-- [ ] Set up semantic versioning
-- [ ] Configure release workflow
-- [ ] Create changelog generation
+- [x] Set up semantic versioning (package.json)
+- [x] Configure GitHub release workflow
+- [x] Create changelog (CHANGELOG.md)
 - [ ] Test release pipeline
 - [ ] Tag v1.0.0
 
-**Deliverable:** First production release
+**Deliverable:** First production release (pending v1.0.0 tag)
 
 ### Acceptance Criteria
 
-- [ ] Application runs in Docker
-- [ ] README includes quick start
-- [ ] API documentation available
-- [ ] Health endpoint returns status
-- [ ] Release creates GitHub release
+- [x] `./scripts/build.sh` creates production bundles
+- [x] `./scripts/start-prod.sh` runs application in production mode
+- [x] README includes quick start guide
+- [x] API documentation available at `/api/docs` or as OpenAPI spec
+- [x] Health endpoint returns application status
+- [x] GitHub release workflow created (releases on tag push)
+- [ ] First release tagged and published
+
+### Why No Docker?
+
+Claude Manager requires direct access to:
+
+- Local git repositories and worktrees
+- Claude Code CLI binary installed on the system
+- File system for reading/writing project files
+- Process spawning for Claude CLI agents
+
+Docker would add unnecessary complexity and configuration overhead for a local development tool. Native deployment provides simpler setup and full system access.
+
+### Files to Create/Modify
+
+```
+scripts/
+├── start-dev.sh          (development startup script)
+├── start-prod.sh         (production startup script)
+└── build.sh              (full production build)
+
+ecosystem.config.js       (PM2 configuration)
+docs/
+├── user-guide.md         (user documentation)
+├── troubleshooting.md    (common issues and solutions)
+└── configuration.md      (environment variables reference)
+
+server/src/routes/docs.routes.ts  (OpenAPI documentation endpoint)
+.github/workflows/release.yml     (release workflow)
+CHANGELOG.md                      (version history)
+```
 
 ---
 

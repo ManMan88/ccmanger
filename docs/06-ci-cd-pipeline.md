@@ -354,13 +354,10 @@ on:
 
 permissions:
   contents: write
-  packages: write
 
 env:
   NODE_VERSION: '20'
   PNPM_VERSION: '9'
-  REGISTRY: ghcr.io
-  IMAGE_NAME: ${{ github.repository }}
 
 jobs:
   # ============================================
@@ -402,60 +399,12 @@ jobs:
           retention-days: 1
 
   # ============================================
-  # DOCKER BUILD & PUSH
-  # ============================================
-  docker:
-    name: Docker Build & Push
-    runs-on: ubuntu-latest
-    needs: build
-    steps:
-      - name: Checkout
-        uses: actions/checkout@v4
-
-      - name: Download artifacts
-        uses: actions/download-artifact@v4
-        with:
-          name: dist
-
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to Container Registry
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Extract metadata
-        id: meta
-        uses: docker/metadata-action@v5
-        with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_NAME }}
-          tags: |
-            type=semver,pattern={{version}}
-            type=semver,pattern={{major}}.{{minor}}
-            type=semver,pattern={{major}}
-            type=sha
-
-      - name: Build and push Docker image
-        uses: docker/build-push-action@v5
-        with:
-          context: .
-          file: ./docker/Dockerfile
-          push: true
-          tags: ${{ steps.meta.outputs.tags }}
-          labels: ${{ steps.meta.outputs.labels }}
-          cache-from: type=gha
-          cache-to: type=gha,mode=max
-
-  # ============================================
   # CREATE GITHUB RELEASE
   # ============================================
   release:
     name: Create Release
     runs-on: ubuntu-latest
-    needs: [build, docker]
+    needs: build
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -572,7 +521,7 @@ name: Dependency Update
 
 on:
   schedule:
-    - cron: '0 6 * * 1'  # Every Monday at 6 AM
+    - cron: '0 6 * * 1' # Every Monday at 6 AM
   workflow_dispatch:
 
 permissions:
@@ -630,159 +579,140 @@ jobs:
             automated
 ```
 
-## Docker Configuration
+## Native Deployment Configuration
 
-### Multi-Stage Dockerfile
+Claude Manager is designed for native deployment (no Docker) because it requires direct access to:
 
-```dockerfile
-# docker/Dockerfile
-# ============================================
-# BASE STAGE
-# ============================================
-FROM node:20-alpine AS base
-RUN apk add --no-cache libc6-compat
-RUN npm install -g pnpm@9
+- Local git repositories and worktrees
+- Claude Code CLI binary installed on the system
+- File system for reading/writing project files
+- Process spawning for Claude CLI agents
 
-WORKDIR /app
+### Production Build Script
 
-# ============================================
-# DEPENDENCIES STAGE
-# ============================================
-FROM base AS deps
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY server/package.json ./server/
-RUN pnpm install --frozen-lockfile --prod
+```bash
+#!/bin/bash
+# scripts/build.sh
+set -e
 
-# ============================================
-# BUILD STAGE - Frontend
-# ============================================
-FROM base AS builder-frontend
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY . .
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @claude-manager/frontend build
+echo "Building Claude Manager for production..."
 
-# ============================================
-# BUILD STAGE - Backend
-# ============================================
-FROM base AS builder-backend
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY server/ ./server/
-COPY shared/ ./shared/
-RUN pnpm install --frozen-lockfile
-RUN pnpm --filter @claude-manager/server build
+# Install dependencies
+pnpm install --frozen-lockfile
 
-# ============================================
-# PRODUCTION STAGE
-# ============================================
-FROM node:20-alpine AS runner
-RUN apk add --no-cache git
+# Build shared types
+pnpm --filter @claude-manager/shared build
 
-WORKDIR /app
+# Build backend
+pnpm --filter @claude-manager/server build
 
-# Create non-root user
-RUN addgroup --system --gid 1001 nodejs
-RUN adduser --system --uid 1001 appuser
+# Build frontend (with production API URL)
+pnpm --filter @claude-manager/frontend build
 
-# Copy production dependencies
-COPY --from=deps /app/node_modules ./node_modules
-COPY --from=deps /app/server/node_modules ./server/node_modules
-
-# Copy built assets
-COPY --from=builder-frontend /app/dist ./dist
-COPY --from=builder-backend /app/server/dist ./server/dist
-
-# Copy package files for runtime
-COPY package.json ./
-COPY server/package.json ./server/
-
-# Set ownership
-RUN chown -R appuser:nodejs /app
-
-USER appuser
-
-# Environment
-ENV NODE_ENV=production
-ENV PORT=3001
-
-EXPOSE 3001
-
-# Health check
-HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
-  CMD wget --no-verbose --tries=1 --spider http://localhost:3001/api/health || exit 1
-
-CMD ["node", "server/dist/index.js"]
+echo "Build complete!"
+echo "  Frontend: dist/"
+echo "  Backend: server/dist/"
 ```
 
-### Docker Compose for Development
+### Development Startup Script
 
-```yaml
-# docker/docker-compose.yml
-version: '3.9'
+```bash
+#!/bin/bash
+# scripts/start-dev.sh
+set -e
 
-services:
-  frontend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.dev
-      target: frontend
-    ports:
-      - "8080:8080"
-    volumes:
-      - ../src:/app/src
-      - ../public:/app/public
-    environment:
-      - VITE_API_URL=http://localhost:3001
-    depends_on:
-      - backend
+# Start backend in background
+echo "Starting backend server..."
+pnpm --filter @claude-manager/server dev &
+BACKEND_PID=$!
 
-  backend:
-    build:
-      context: ..
-      dockerfile: docker/Dockerfile.dev
-      target: backend
-    ports:
-      - "3001:3001"
-    volumes:
-      - ../server/src:/app/server/src
-      - ../shared:/app/shared
-      - claude-manager-data:/root/.claude-manager
-    environment:
-      - NODE_ENV=development
-      - PORT=3001
-      - DB_PATH=/root/.claude-manager/data.db
-      - CORS_ORIGIN=http://localhost:8080
+# Wait for backend to be ready
+echo "Waiting for backend..."
+while ! curl -s http://localhost:3001/api/health > /dev/null; do
+  sleep 1
+done
+echo "Backend ready!"
 
-volumes:
-  claude-manager-data:
+# Start frontend
+echo "Starting frontend..."
+pnpm dev
+
+# Cleanup on exit
+trap "kill $BACKEND_PID 2>/dev/null" EXIT
 ```
 
-### Development Dockerfile
+### Production Startup Script
 
-```dockerfile
-# docker/Dockerfile.dev
-# Frontend development stage
-FROM node:20-alpine AS frontend
-RUN npm install -g pnpm@9
-WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-RUN pnpm install
-COPY . .
-EXPOSE 8080
-CMD ["pnpm", "run", "dev"]
+```bash
+#!/bin/bash
+# scripts/start-prod.sh
+set -e
 
-# Backend development stage
-FROM node:20-alpine AS backend
-RUN apk add --no-cache git
-RUN npm install -g pnpm@9
-WORKDIR /app
-COPY package.json pnpm-lock.yaml pnpm-workspace.yaml ./
-COPY server/package.json ./server/
-COPY shared/ ./shared/
-RUN pnpm install
-COPY server/ ./server/
-EXPOSE 3001
-CMD ["pnpm", "--filter", "@claude-manager/server", "run", "dev"]
+export NODE_ENV=production
+
+# Check if built
+if [ ! -d "dist" ] || [ ! -d "server/dist" ]; then
+  echo "Production build not found. Run 'npm run build' first."
+  exit 1
+fi
+
+# Start backend server (serves both API and static frontend)
+echo "Starting Claude Manager..."
+node server/dist/index.js
+```
+
+### PM2 Configuration (Optional Process Manager)
+
+```javascript
+// ecosystem.config.js
+module.exports = {
+  apps: [
+    {
+      name: 'claude-manager',
+      script: 'server/dist/index.js',
+      instances: 1,
+      autorestart: true,
+      watch: false,
+      max_memory_restart: '500M',
+      env: {
+        NODE_ENV: 'development',
+        PORT: 3001,
+      },
+      env_production: {
+        NODE_ENV: 'production',
+        PORT: 3001,
+      },
+      error_file: '~/.claude-manager/logs/error.log',
+      out_file: '~/.claude-manager/logs/out.log',
+      log_date_format: 'YYYY-MM-DD HH:mm:ss Z',
+    },
+  ],
+}
+```
+
+### Systemd Service (Linux)
+
+```ini
+# /etc/systemd/system/claude-manager.service
+[Unit]
+Description=Claude Manager
+After=network.target
+
+[Service]
+Type=simple
+User=YOUR_USER
+WorkingDirectory=/path/to/claude-manager
+ExecStart=/usr/bin/node server/dist/index.js
+Restart=on-failure
+RestartSec=10
+StandardOutput=syslog
+StandardError=syslog
+SyslogIdentifier=claude-manager
+Environment=NODE_ENV=production
+Environment=PORT=3001
+
+[Install]
+WantedBy=multi-user.target
 ```
 
 ## Quality Gates
@@ -794,11 +724,11 @@ CMD ["pnpm", "--filter", "@claude-manager/server", "run", "dev"]
 required_status_checks:
   strict: true
   contexts:
-    - "Lint & Type Check"
-    - "Frontend Tests"
-    - "Backend Tests"
-    - "Build"
-    - "Security Scan"
+    - 'Lint & Type Check'
+    - 'Frontend Tests'
+    - 'Backend Tests'
+    - 'Build'
+    - 'Security Scan'
 
 required_pull_request_reviews:
   dismiss_stale_reviews: true
@@ -818,7 +748,7 @@ allow_deletions: false
 coverage:
   precision: 2
   round: down
-  range: "70...100"
+  range: '70...100'
   status:
     project:
       default:
@@ -838,7 +768,7 @@ parsers:
       macro: no
 
 comment:
-  layout: "reach,diff,flags,files"
+  layout: 'reach,diff,flags,files'
   behavior: default
   require_changes: true
 ```
@@ -847,14 +777,13 @@ comment:
 
 ### Required Secrets
 
-| Secret | Description | Required For |
-|--------|-------------|--------------|
-| `CODECOV_TOKEN` | Codecov upload token | Coverage reporting |
-| `VERCEL_TOKEN` | Vercel deployment token | Preview deployments |
-| `VERCEL_ORG_ID` | Vercel organization ID | Preview deployments |
-| `VERCEL_PROJECT_ID` | Vercel project ID | Preview deployments |
-| `DOCKER_USERNAME` | Docker Hub username | Docker publishing |
-| `DOCKER_PASSWORD` | Docker Hub password | Docker publishing |
+| Secret              | Description             | Required For                   |
+| ------------------- | ----------------------- | ------------------------------ |
+| `CODECOV_TOKEN`     | Codecov upload token    | Coverage reporting             |
+| `VERCEL_TOKEN`      | Vercel deployment token | Preview deployments (optional) |
+| `VERCEL_ORG_ID`     | Vercel organization ID  | Preview deployments (optional) |
+| `VERCEL_PROJECT_ID` | Vercel project ID       | Preview deployments (optional) |
+| `SLACK_WEBHOOK`     | Slack webhook URL       | CI notifications (optional)    |
 
 ### Environment Variables
 

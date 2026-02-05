@@ -20,3 +20,33 @@ export {
   type CurrentUsage,
   type UsageHistoryQuery,
 } from './usage.service.js'
+export {
+  getMetrics,
+  recordRequest,
+  recordWebSocketConnection,
+  recordAgentSpawn,
+  recordAgentTermination,
+  recordMessageProcessed,
+  setRunningAgentCount,
+  updateWebSocketSubscriptions,
+  resetMetrics,
+  type ApplicationMetrics,
+  type RequestMetrics,
+  type ConnectionMetrics,
+  type ProcessMetrics,
+  type SystemMetrics,
+} from './metrics.service.js'
+export {
+  initializeErrorTracking,
+  captureError,
+  captureMessage,
+  setUserContext,
+  addBreadcrumb,
+  getRecentErrors,
+  getErrorById,
+  getErrorStats,
+  clearErrors,
+  flushErrors,
+  type ErrorContext,
+  type ErrorReport,
+} from './error-tracking.service.js'

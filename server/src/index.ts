@@ -6,8 +6,16 @@ import { logger } from './utils/logger.js'
 import { getProcessManager, resetProcessManager } from './services/process.service.js'
 import { AgentRepository } from './db/repositories/agent.repository.js'
 import { cleanupWebSocket } from './websocket/index.js'
+import {
+  initializeErrorTracking,
+  captureError,
+  flushErrors,
+} from './services/error-tracking.service.js'
 
 async function main() {
+  // Initialize error tracking
+  await initializeErrorTracking()
+
   // Initialize database and run migrations
   const db = initDatabase()
   runMigrations(db)
@@ -59,13 +67,19 @@ async function main() {
   process.on('SIGTERM', () => shutdown('SIGTERM'))
 
   // Handle uncaught exceptions
-  process.on('uncaughtException', (error) => {
+  process.on('uncaughtException', async (error) => {
+    captureError(error, { operation: 'uncaughtException' })
     logger.fatal({ error }, 'Uncaught exception')
+    await flushErrors()
     process.exit(1)
   })
 
-  process.on('unhandledRejection', (reason) => {
+  process.on('unhandledRejection', async (reason) => {
+    captureError(reason instanceof Error ? reason : new Error(String(reason)), {
+      operation: 'unhandledRejection',
+    })
     logger.fatal({ reason }, 'Unhandled rejection')
+    await flushErrors()
     process.exit(1)
   })
 
