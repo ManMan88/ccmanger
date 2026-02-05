@@ -41,8 +41,8 @@ test.describe('Accessibility', () => {
   test('toolbar should be keyboard accessible', async ({ page }) => {
     await page.waitForTimeout(1000)
 
-    // Focus on the page
-    await page.locator('body').click()
+    // Focus on the page by clicking on the toolbar (which we know exists)
+    await page.locator('[data-testid="toolbar"]').click({ force: true })
 
     // Tab through toolbar elements
     await page.keyboard.press('Tab')

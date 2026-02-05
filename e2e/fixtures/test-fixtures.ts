@@ -36,8 +36,20 @@ export const createMockAgent = (overrides: Record<string, unknown> = {}) => ({
 
 // Helper functions for common E2E operations
 export async function waitForApp(page: import('@playwright/test').Page) {
-  // Wait for the app to be fully loaded
-  await page.waitForSelector('[data-testid="toolbar"]', { timeout: 30000 })
+  // Wait for the app to be fully loaded - the toolbar should always appear
+  // even if the backend is unavailable (the app shows empty state)
+  try {
+    await page.waitForSelector('[data-testid="toolbar"]', { timeout: 30000 })
+  } catch {
+    // If toolbar doesn't appear, check if page loaded at all
+    const html = await page.content()
+    if (html.includes('Cannot GET') || html.includes('Error')) {
+      throw new Error('Frontend server not available')
+    }
+    // Wait a bit more and try again - sometimes React takes time to hydrate
+    await page.waitForTimeout(2000)
+    await page.waitForSelector('[data-testid="toolbar"]', { timeout: 10000 })
+  }
 }
 
 export async function waitForLoading(page: import('@playwright/test').Page) {

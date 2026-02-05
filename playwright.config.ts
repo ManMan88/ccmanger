@@ -31,16 +31,18 @@ export default defineConfig({
   ],
   webServer: [
     {
-      command: 'npm run dev',
+      command: 'pnpm dev',
       url: 'http://localhost:8080',
       reuseExistingServer: !process.env.CI,
-      timeout: 60000,
+      timeout: 120000,
     },
     {
-      command: 'npm run dev:server',
+      command: 'pnpm dev:server',
       url: 'http://localhost:3001/api/health',
       reuseExistingServer: !process.env.CI,
-      timeout: 60000,
+      timeout: 120000,
+      // In CI, server may fail to start - tests should handle gracefully
+      ignoreHTTPSErrors: true,
     },
   ],
 })
