@@ -131,3 +131,121 @@ impl<T> OptionalExt<T> for Result<T, rusqlite::Error> {
         }
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::DbPool;
+    use r2d2::Pool;
+    use r2d2_sqlite::SqliteConnectionManager;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    // Counter for unique database paths
+    static DB_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    fn create_test_pool() -> DbPool {
+        // Use unique path for each test to avoid conflicts
+        let counter = DB_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let db_path = format!(
+            "/tmp/test_db_{}_workspace_{}.db",
+            std::process::id(),
+            counter
+        );
+
+        // Clean up if exists
+        let _ = std::fs::remove_file(&db_path);
+
+        let manager = SqliteConnectionManager::file(&db_path).with_init(|conn| {
+            conn.execute_batch(
+                r#"
+                PRAGMA foreign_keys = ON;
+                "#,
+            )?;
+            Ok(())
+        });
+
+        let pool = Pool::builder().max_size(5).build(manager).unwrap();
+
+        // Run migrations
+        let conn = pool.get().unwrap();
+        crate::db::migrations::run_migrations(&conn).unwrap();
+
+        pool
+    }
+
+    fn create_test_workspace() -> Workspace {
+        let now = chrono::Utc::now().to_rfc3339();
+        Workspace {
+            id: format!("ws_{}", uuid::Uuid::new_v4()),
+            name: "Test Workspace".to_string(),
+            path: format!("/tmp/test-workspace-{}", uuid::Uuid::new_v4()),
+            created_at: now.clone(),
+            updated_at: now,
+            worktree_count: 0,
+            agent_count: 0,
+        }
+    }
+
+    #[test]
+    fn test_create_workspace() {
+        let pool = create_test_pool();
+        let repo = WorkspaceRepository::new(pool);
+
+        let workspace = create_test_workspace();
+        let created = repo.create(&workspace).unwrap();
+
+        assert_eq!(created.id, workspace.id);
+        assert_eq!(created.name, "Test Workspace");
+        assert_eq!(created.path, workspace.path);
+    }
+
+    #[test]
+    fn test_find_by_id() {
+        let pool = create_test_pool();
+        let repo = WorkspaceRepository::new(pool);
+
+        let workspace = create_test_workspace();
+        repo.create(&workspace).unwrap();
+
+        let found = repo.find_by_id(&workspace.id).unwrap();
+        assert!(found.is_some());
+        assert_eq!(found.unwrap().id, workspace.id);
+    }
+
+    #[test]
+    fn test_find_by_id_not_found() {
+        let pool = create_test_pool();
+        let repo = WorkspaceRepository::new(pool);
+
+        let found = repo.find_by_id("nonexistent").unwrap();
+        assert!(found.is_none());
+    }
+
+    #[test]
+    fn test_find_all() {
+        let pool = create_test_pool();
+        let repo = WorkspaceRepository::new(pool);
+
+        let workspace1 = create_test_workspace();
+        let workspace2 = create_test_workspace();
+
+        repo.create(&workspace1).unwrap();
+        repo.create(&workspace2).unwrap();
+
+        let all = repo.find_all().unwrap();
+        assert_eq!(all.len(), 2);
+    }
+
+    #[test]
+    fn test_delete() {
+        let pool = create_test_pool();
+        let repo = WorkspaceRepository::new(pool);
+
+        let workspace = create_test_workspace();
+        repo.create(&workspace).unwrap();
+        repo.delete(&workspace.id).unwrap();
+
+        let found = repo.find_by_id(&workspace.id).unwrap();
+        assert!(found.is_none());
+    }
+}

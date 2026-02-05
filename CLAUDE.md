@@ -12,7 +12,7 @@ Claude Manager provides a visual interface to:
 - Configure agent modes (auto-approve/plan/regular) and permissions
 - View API usage statistics
 
-**Current State**: Rust + Tauri backend Phase 1 complete. The project scaffold compiles successfully with all core modules in place. The Node.js implementation remains available as reference (175+ tests).
+**Current State**: Rust + Tauri backend Phase 6 (Frontend Integration) complete. The frontend API client now supports both Tauri IPC and HTTP fallback. 25 unit tests pass for repository and service layers. The Node.js implementation remains available as reference (175+ tests).
 
 ## 🚀 Migration Status: Node.js → Rust + Tauri
 
@@ -28,17 +28,17 @@ This project is transitioning from a Node.js/Fastify backend to a native Rust ba
 
 ### Migration Phases
 
-| Phase | Description                 | Status                   |
-| ----- | --------------------------- | ------------------------ |
-| 1     | Project Setup & Tauri Init  | ✅ Complete              |
-| 2     | Core Types & Database Layer | ✅ Complete (in Phase 1) |
-| 3     | Service Layer               | ✅ Complete (in Phase 1) |
-| 4     | WebSocket Server            | ✅ Complete (in Phase 1) |
-| 5     | Tauri Commands (IPC)        | ✅ Complete (in Phase 1) |
-| 6     | Frontend Integration        | ⬜ Not Started           |
-| 7     | Build & Distribution        | ⬜ Not Started           |
-| 8     | Data Migration              | ⬜ Not Started           |
-| 9     | Comprehensive Testing       | ⬜ Not Started           |
+| Phase | Description                 | Status                    |
+| ----- | --------------------------- | ------------------------- |
+| 1     | Project Setup & Tauri Init  | ✅ Complete               |
+| 2     | Core Types & Database Layer | ✅ Complete (in Phase 1)  |
+| 3     | Service Layer               | ✅ Complete (in Phase 1)  |
+| 4     | WebSocket Server            | ✅ Complete (in Phase 1)  |
+| 5     | Tauri Commands (IPC)        | ✅ Complete (in Phase 1)  |
+| 6     | Frontend Integration        | ✅ Complete               |
+| 7     | Build & Distribution        | ⬜ Not Started            |
+| 8     | Data Migration              | ⬜ Not Started            |
+| 9     | Comprehensive Testing       | 🟡 In Progress (25 tests) |
 
 ### Phase 1 Deliverables (Complete)
 
@@ -50,6 +50,14 @@ This project is transitioning from a Node.js/Fastify backend to a native Rust ba
 - Git operations using git2-rs
 - Process manager for Claude CLI agents
 - Compiles successfully with `cargo check`
+
+### Phase 6 Deliverables (Complete)
+
+- **Frontend API client** updated to support Tauri IPC commands with HTTP fallback
+- **WebSocket client** compatible with both Node.js and Rust backends
+- **@tauri-apps/api** dependency added for frontend-backend IPC
+- **25 unit tests** for repository and service layers
+- Full release build compiles successfully
 
 ## Documentation
 

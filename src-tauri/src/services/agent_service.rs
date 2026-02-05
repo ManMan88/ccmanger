@@ -268,3 +268,340 @@ impl AgentService {
         self.list_agents(worktree_id, false)
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::db::DbPool;
+    use crate::types::{SortMode, Workspace, Worktree};
+    use r2d2::Pool;
+    use r2d2_sqlite::SqliteConnectionManager;
+    use std::sync::atomic::{AtomicUsize, Ordering};
+
+    static DB_COUNTER: AtomicUsize = AtomicUsize::new(0);
+
+    fn create_test_pool() -> DbPool {
+        let counter = DB_COUNTER.fetch_add(1, Ordering::SeqCst);
+        let db_path = format!(
+            "/tmp/test_db_{}_agent_service_{}.db",
+            std::process::id(),
+            counter
+        );
+        let _ = std::fs::remove_file(&db_path);
+
+        let manager = SqliteConnectionManager::file(&db_path).with_init(|conn| {
+            conn.execute_batch("PRAGMA foreign_keys = ON;")?;
+            Ok(())
+        });
+
+        let pool = Pool::builder().max_size(5).build(manager).unwrap();
+        let conn = pool.get().unwrap();
+        crate::db::migrations::run_migrations(&conn).unwrap();
+
+        pool
+    }
+
+    fn setup_test_data(pool: &DbPool) -> (Workspace, Worktree) {
+        let now = chrono::Utc::now().to_rfc3339();
+        let workspace = Workspace {
+            id: format!("ws_{}", Uuid::new_v4()),
+            name: "Test Workspace".to_string(),
+            path: format!("/tmp/test-workspace-{}", Uuid::new_v4()),
+            created_at: now.clone(),
+            updated_at: now.clone(),
+            worktree_count: 0,
+            agent_count: 0,
+        };
+
+        let worktree = Worktree {
+            id: format!("wt_{}", Uuid::new_v4()),
+            workspace_id: workspace.id.clone(),
+            name: "main".to_string(),
+            branch: "main".to_string(),
+            path: workspace.path.clone(),
+            sort_mode: SortMode::Free,
+            display_order: 0,
+            is_main: true,
+            created_at: now.clone(),
+            updated_at: now,
+        };
+
+        let conn = pool.get().unwrap();
+        conn.execute(
+            r#"INSERT INTO workspaces (id, name, path, created_at, updated_at) VALUES (?, ?, ?, ?, ?)"#,
+            rusqlite::params![
+                workspace.id,
+                workspace.name,
+                workspace.path,
+                workspace.created_at,
+                workspace.updated_at,
+            ],
+        )
+        .unwrap();
+
+        conn.execute(
+            r#"INSERT INTO worktrees (id, workspace_id, name, branch, path, sort_mode, display_order, is_main, created_at, updated_at)
+               VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)"#,
+            rusqlite::params![
+                worktree.id,
+                worktree.workspace_id,
+                worktree.name,
+                worktree.branch,
+                worktree.path,
+                "free",
+                worktree.display_order,
+                worktree.is_main as i32,
+                worktree.created_at,
+                worktree.updated_at,
+            ],
+        )
+        .unwrap();
+
+        (workspace, worktree)
+    }
+
+    #[test]
+    fn test_create_agent() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let agent = service
+            .create_agent(
+                &worktree.id,
+                Some("Test Agent".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+
+        assert_eq!(agent.name, "Test Agent");
+        assert_eq!(agent.mode, AgentMode::Regular);
+        assert_eq!(agent.status, AgentStatus::Finished);
+        assert!(agent.id.starts_with("ag_"));
+    }
+
+    #[test]
+    fn test_get_agent() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let created = service
+            .create_agent(
+                &worktree.id,
+                Some("Test Agent".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+
+        let found = service.get_agent(&created.id).unwrap();
+        assert_eq!(found.id, created.id);
+        assert_eq!(found.name, "Test Agent");
+    }
+
+    #[test]
+    fn test_get_agent_not_found() {
+        let pool = create_test_pool();
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let result = service.get_agent("nonexistent");
+        assert!(matches!(result, Err(AgentError::NotFound(_))));
+    }
+
+    #[test]
+    fn test_list_agents() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        service
+            .create_agent(
+                &worktree.id,
+                Some("Agent 1".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+        service
+            .create_agent(
+                &worktree.id,
+                Some("Agent 2".to_string()),
+                AgentMode::Auto,
+                vec![Permission::Read, Permission::Write],
+            )
+            .unwrap();
+
+        let agents = service.list_agents(&worktree.id, false).unwrap();
+        assert_eq!(agents.len(), 2);
+    }
+
+    #[test]
+    fn test_update_agent() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let created = service
+            .create_agent(
+                &worktree.id,
+                Some("Test Agent".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+
+        let updated = service
+            .update_agent(
+                &created.id,
+                UpdateAgentInput {
+                    name: Some("Updated Agent".to_string()),
+                    mode: Some(AgentMode::Auto),
+                    permissions: None,
+                    display_order: None,
+                },
+            )
+            .unwrap();
+
+        assert_eq!(updated.name, "Updated Agent");
+        assert_eq!(updated.mode, AgentMode::Auto);
+    }
+
+    #[test]
+    fn test_delete_agent_archive() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let created = service
+            .create_agent(
+                &worktree.id,
+                Some("Test Agent".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+
+        service.delete_agent(&created.id, true).unwrap();
+
+        // Should not appear in normal list
+        let agents = service.list_agents(&worktree.id, false).unwrap();
+        assert_eq!(agents.len(), 0);
+
+        // Should appear with include_deleted
+        let agents = service.list_agents(&worktree.id, true).unwrap();
+        assert_eq!(agents.len(), 1);
+    }
+
+    #[test]
+    fn test_delete_agent_permanent() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let created = service
+            .create_agent(
+                &worktree.id,
+                Some("Test Agent".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+
+        service.delete_agent(&created.id, false).unwrap();
+
+        // Should not appear even with include_deleted
+        let agents = service.list_agents(&worktree.id, true).unwrap();
+        assert_eq!(agents.len(), 0);
+    }
+
+    #[test]
+    fn test_fork_agent() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let parent = service
+            .create_agent(
+                &worktree.id,
+                Some("Parent Agent".to_string()),
+                AgentMode::Auto,
+                vec![Permission::Read, Permission::Write],
+            )
+            .unwrap();
+
+        let forked = service.fork_agent(&parent.id, None).unwrap();
+
+        assert_eq!(forked.name, "Parent Agent (fork)");
+        assert_eq!(forked.mode, AgentMode::Auto);
+        assert_eq!(forked.permissions, vec![Permission::Read, Permission::Write]);
+        assert_eq!(forked.parent_agent_id, Some(parent.id));
+    }
+
+    #[test]
+    fn test_restore_agent() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let created = service
+            .create_agent(
+                &worktree.id,
+                Some("Test Agent".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+
+        service.delete_agent(&created.id, true).unwrap();
+        let restored = service.restore_agent(&created.id).unwrap();
+
+        assert!(restored.deleted_at.is_none());
+
+        let agents = service.list_agents(&worktree.id, false).unwrap();
+        assert_eq!(agents.len(), 1);
+    }
+
+    #[test]
+    fn test_reorder_agents() {
+        let pool = create_test_pool();
+        let (_, worktree) = setup_test_data(&pool);
+        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
+        let service = AgentService::new(pool, process_manager);
+
+        let agent1 = service
+            .create_agent(
+                &worktree.id,
+                Some("Agent 1".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+        let agent2 = service
+            .create_agent(
+                &worktree.id,
+                Some("Agent 2".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            )
+            .unwrap();
+
+        // Reorder: agent2 first
+        let reordered = service
+            .reorder_agents(&worktree.id, &[agent2.id.clone(), agent1.id.clone()])
+            .unwrap();
+
+        assert_eq!(reordered[0].display_order, 0);
+        assert_eq!(reordered[1].display_order, 1);
+    }
+}
