@@ -74,7 +74,6 @@ claude-manager/
 │   │   ├── db/                    # Database layer
 │   │   │   ├── connection.rs
 │   │   │   ├── migrations.rs
-│   │   │   ├── migration_tool.rs  # Data migration utility
 │   │   │   └── repositories/
 │   │   ├── websocket/             # WebSocket server (Axum)
 │   │   ├── types/                 # Rust type definitions
@@ -82,7 +81,7 @@ claude-manager/
 │   ├── tests/                     # Integration tests (38 tests)
 │   │   ├── common/                # Test utilities, fixtures, mocks
 │   │   ├── api/                   # API integration tests
-│   │   └── database/              # Migration tests
+│   │   └── database/              # Database tests
 │   └── benches/                   # Performance benchmarks (Criterion)
 │
 ├── shared/                        # Shared types package
