@@ -4,6 +4,7 @@ import { config } from './config/index.js'
 import { logger } from './utils/logger.js'
 import { errorHandler } from './middleware/error-handler.js'
 import { registerRoutes } from './routes/index.js'
+import { registerWebSocketHandler } from './websocket/index.js'
 
 export async function buildApp() {
   const app = Fastify({
@@ -17,6 +18,9 @@ export async function buildApp() {
     origin: config.cors.origin,
     credentials: true,
   })
+
+  // Register WebSocket handler
+  await registerWebSocketHandler(app)
 
   // Request logging
   app.addHook('onRequest', async (request) => {

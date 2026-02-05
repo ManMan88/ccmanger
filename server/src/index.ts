@@ -5,6 +5,7 @@ import { runMigrations } from './db/migrate.js'
 import { logger } from './utils/logger.js'
 import { getProcessManager, resetProcessManager } from './services/process.service.js'
 import { AgentRepository } from './db/repositories/agent.repository.js'
+import { cleanupWebSocket } from './websocket/index.js'
 
 async function main() {
   // Initialize database and run migrations
@@ -27,6 +28,9 @@ async function main() {
     logger.info({ signal }, 'Shutdown signal received')
 
     try {
+      // Clean up WebSocket connections first
+      cleanupWebSocket()
+
       // Stop all running agent processes
       const processManager = getProcessManager()
       const runningCount = processManager.getRunningCount()

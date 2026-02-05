@@ -16,6 +16,7 @@ import {
   AgentQuerySchema,
   MessageQuerySchema,
 } from '../validation/schemas.js'
+import { getEventBroadcaster } from '../websocket/index.js'
 
 interface AgentParams {
   id: string
@@ -63,6 +64,21 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       mode: body.mode,
       permissions: body.permissions,
     })
+
+    // Broadcast workspace update - need to get workspace ID from worktree
+    const worktree = worktreeRepo.findById(body.worktreeId)
+    if (worktree) {
+      const broadcaster = getEventBroadcaster()
+      if (broadcaster) {
+        broadcaster.broadcastWorkspaceUpdate(worktree.workspace_id, 'agent_added', {
+          id: agent.id,
+          name: agent.name,
+          worktreeId: agent.worktreeId,
+          status: agent.status,
+        })
+      }
+    }
+
     return reply.status(201).send(agent)
   })
 
@@ -76,6 +92,21 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
         mode: body.mode,
         permissions: body.permissions,
       })
+
+      // Broadcast workspace update
+      const worktree = worktreeRepo.findById(agent.worktreeId)
+      if (worktree) {
+        const broadcaster = getEventBroadcaster()
+        if (broadcaster) {
+          broadcaster.broadcastWorkspaceUpdate(worktree.workspace_id, 'agent_updated', {
+            id: agent.id,
+            name: agent.name,
+            mode: agent.mode,
+            permissions: agent.permissions,
+          })
+        }
+      }
+
       return reply.send(agent)
     }
   )
@@ -88,7 +119,25 @@ export async function agentRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply
     ) => {
       const archive = request.query.archive !== 'false'
-      await agentService.deleteAgent(request.params.id, archive)
+      const agentId = request.params.id
+
+      // Get agent info before deletion for broadcasting
+      const agent = await agentService.getAgentById(agentId)
+      const worktree = agent ? worktreeRepo.findById(agent.worktreeId) : null
+
+      await agentService.deleteAgent(agentId, archive)
+
+      // Broadcast workspace update
+      if (worktree) {
+        const broadcaster = getEventBroadcaster()
+        if (broadcaster) {
+          broadcaster.broadcastWorkspaceUpdate(worktree.workspace_id, 'agent_removed', {
+            id: agentId,
+            worktreeId: worktree.id,
+          })
+        }
+      }
+
       return reply.status(204).send()
     }
   )

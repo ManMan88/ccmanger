@@ -188,12 +188,12 @@ See [docs/01-architecture-overview.md](docs/01-architecture-overview.md) for det
 | Backend API (Phase 0-1)        | ✅ Complete    | [API Spec](docs/02-api-specification.md)             |
 | Database                       | ✅ Complete    | [Schema](docs/03-database-schema.md)                 |
 | Process Management (Phase 2)   | ✅ Complete    | [Implementation](docs/04-backend-implementation.md)  |
-| WebSocket (Phase 3)            | ⏳ Planned     | [API Spec](docs/02-api-specification.md)             |
+| WebSocket (Phase 3)            | ✅ Complete    | [API Spec](docs/02-api-specification.md)             |
 | Frontend Integration (Phase 4) | ⏳ Planned     | [Integration Guide](docs/08-frontend-integration.md) |
 | CI/CD                          | ✅ Complete    | [Pipeline](docs/06-ci-cd-pipeline.md)                |
 | Testing                        | ✅ In Progress | [Strategy](docs/05-testing-strategy.md)              |
 
-**Backend Test Coverage:** 112 tests passing (unit + integration)
+**Backend Test Coverage:** 175 tests passing (unit + integration)
 
 ## Component Hierarchy
 

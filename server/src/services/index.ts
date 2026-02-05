@@ -14,3 +14,9 @@ export {
   type SpawnAgentOptions,
   type ProcessManagerEvents,
 } from './process.service.js'
+export {
+  UsageService,
+  type UsageLimits,
+  type CurrentUsage,
+  type UsageHistoryQuery,
+} from './usage.service.js'

@@ -12,6 +12,7 @@ import {
   CheckoutBranchSchema,
   ReorderWorktreesSchema,
 } from '../validation/schemas.js'
+import { getEventBroadcaster } from '../websocket/index.js'
 
 interface WorkspaceWorktreeParams {
   workspaceId: string
@@ -45,6 +46,17 @@ export async function worktreeRoutes(app: FastifyInstance): Promise<void> {
         branch: body.branch,
         createBranch: body.createBranch,
       })
+
+      // Broadcast workspace update
+      const broadcaster = getEventBroadcaster()
+      if (broadcaster) {
+        broadcaster.broadcastWorkspaceUpdate(request.params.workspaceId, 'worktree_added', {
+          id: worktree.id,
+          name: worktree.name,
+          branch: worktree.branch,
+        })
+      }
+
       return reply.status(201).send(worktree)
     }
   )
@@ -85,7 +97,17 @@ export async function worktreeRoutes(app: FastifyInstance): Promise<void> {
       reply: FastifyReply
     ) => {
       const force = request.query.force === 'true'
-      await worktreeService.deleteWorktree(request.params.id!, force)
+      const worktreeId = request.params.id!
+      await worktreeService.deleteWorktree(worktreeId, force)
+
+      // Broadcast workspace update
+      const broadcaster = getEventBroadcaster()
+      if (broadcaster) {
+        broadcaster.broadcastWorkspaceUpdate(request.params.workspaceId, 'worktree_removed', {
+          id: worktreeId,
+        })
+      }
+
       return reply.status(204).send()
     }
   )

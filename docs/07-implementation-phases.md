@@ -349,63 +349,72 @@ server/tests/integration/agent.routes.test.ts (Updated - +9 tests)
 
 #### 3.1 WebSocket Server Setup
 
-- [ ] Configure @fastify/websocket
-- [ ] Create WebSocket connection handler
-- [ ] Implement client tracking
-- [ ] Add heartbeat/ping-pong mechanism
-- [ ] Handle client disconnection cleanup
+- [x] Configure @fastify/websocket
+- [x] Create WebSocket connection handler
+- [x] Implement client tracking
+- [x] Add heartbeat/ping-pong mechanism
+- [x] Handle client disconnection cleanup
 
-**Deliverable:** WebSocket server accepts connections
+**Deliverable:** WebSocket server accepts connections ✅
 
 #### 3.2 Subscription System
 
-- [ ] Implement subscription messages
-  - [ ] `subscribe:agent`
-  - [ ] `unsubscribe:agent`
-  - [ ] `subscribe:workspace`
-  - [ ] `unsubscribe:workspace`
-- [ ] Track subscriptions per client
-- [ ] Add subscription validation
+- [x] Implement subscription messages
+  - [x] `subscribe:agent`
+  - [x] `unsubscribe:agent`
+  - [x] `subscribe:workspace`
+  - [x] `unsubscribe:workspace`
+- [x] Track subscriptions per client
+- [x] Add subscription validation
 
-**Deliverable:** Clients can subscribe to updates
+**Deliverable:** Clients can subscribe to updates ✅
 
 #### 3.3 Event Broadcasting
 
-- [ ] Connect `ProcessManager` events to WebSocket
-- [ ] Broadcast `agent:output` events
-- [ ] Broadcast `agent:status` events
-- [ ] Broadcast `agent:context` events
-- [ ] Broadcast `agent:error` events
-- [ ] Broadcast `workspace:updated` events
+- [x] Connect `ProcessManager` events to WebSocket
+- [x] Broadcast `agent:output` events
+- [x] Broadcast `agent:status` events
+- [x] Broadcast `agent:context` events
+- [x] Broadcast `agent:error` events
+- [x] Broadcast `workspace:updated` events
 
-**Deliverable:** Real-time events reach subscribed clients
+**Deliverable:** Real-time events reach subscribed clients ✅
 
 #### 3.4 Message Streaming
 
-- [ ] Buffer output for batching
-- [ ] Implement streaming flag for incomplete messages
-- [ ] Handle large output efficiently
-- [ ] Add message deduplication
+- [x] Buffer output for batching
+- [x] Implement streaming flag for incomplete messages
+- [x] Handle large output efficiently
+- [x] Add message deduplication (via status change tracking)
 
-**Deliverable:** Efficient streaming of agent output
+**Deliverable:** Efficient streaming of agent output ✅
 
 #### 3.5 Usage Stats Updates
 
-- [ ] Create `UsageService`
-- [ ] Track API usage in database
-- [ ] Broadcast usage updates via WebSocket
-- [ ] Implement usage endpoint `GET /api/usage`
+- [x] Create `UsageService`
+- [x] Track API usage in database
+- [x] Broadcast usage updates via WebSocket
+- [x] Implement usage endpoint `GET /api/usage`
 
-**Deliverable:** Real-time usage tracking
+**Deliverable:** Real-time usage tracking ✅
 
 ### Acceptance Criteria
 
-- [ ] WebSocket connects at `/ws`
-- [ ] Subscribing to agent receives its output
-- [ ] Status changes broadcast to subscribers
-- [ ] Multiple clients receive same updates
-- [ ] Disconnected clients cleaned up properly
-- [ ] Heartbeat keeps connection alive
+- [x] WebSocket connects at `/ws`
+- [x] Subscribing to agent receives its output
+- [x] Status changes broadcast to subscribers
+- [x] Multiple clients receive same updates
+- [x] Disconnected clients cleaned up properly
+- [x] Heartbeat keeps connection alive
+
+### Testing
+
+- [x] Unit tests for WebSocket components (51 tests)
+  - client-manager.test.ts (21 tests)
+  - event-broadcaster.test.ts (14 tests)
+  - heartbeat-manager.test.ts (5 tests)
+  - message-handler.test.ts (11 tests)
+- [x] Integration tests for WebSocket routes (11 tests)
 
 ### WebSocket Events Delivered
 
@@ -426,6 +435,39 @@ Server → Client:
   workspace:updated
   usage:updated
   pong
+```
+
+### API Endpoints Delivered
+
+```
+GET    /api/usage          (get current usage statistics)
+GET    /api/usage/history  (get usage history)
+GET    /api/usage/today    (get today's detailed stats)
+GET    /api/usage/limits   (get current usage limits)
+```
+
+### Files Created
+
+```
+server/src/websocket/
+├── index.ts            (exports and registration)
+├── types.ts            (WebSocket message types)
+├── handler.ts          (WebSocket route handler)
+├── client-manager.ts   (client tracking and subscriptions)
+├── message-handler.ts  (incoming message validation/routing)
+├── event-broadcaster.ts (process events → WebSocket broadcasts)
+└── heartbeat-manager.ts (stale client cleanup)
+
+server/src/services/usage.service.ts  (usage tracking service)
+server/src/routes/usage.routes.ts     (usage API endpoints)
+
+server/tests/unit/websocket/
+├── client-manager.test.ts
+├── event-broadcaster.test.ts
+├── heartbeat-manager.test.ts
+└── message-handler.test.ts
+
+server/tests/integration/websocket.routes.test.ts
 ```
 
 ---
