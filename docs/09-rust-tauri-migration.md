@@ -1,5 +1,20 @@
 # Rust Backend + Tauri Migration Plan
 
+## Migration Status
+
+| Phase | Description                 | Status                   |
+| ----- | --------------------------- | ------------------------ |
+| 1     | Project Setup & Foundation  | ✅ **Complete**          |
+| 2     | Core Types & Database Layer | ✅ Complete (in Phase 1) |
+| 3     | Service Layer               | ✅ Complete (in Phase 1) |
+| 4     | WebSocket Server            | ✅ Complete (in Phase 1) |
+| 5     | Tauri Commands (IPC)        | ✅ Complete (in Phase 1) |
+| 6     | Frontend Integration        | ⬜ Not Started           |
+| 7     | Build & Distribution        | ⬜ Not Started           |
+| 8     | Migration & Testing         | ⬜ Not Started           |
+
+**Phase 1 delivered all core scaffolding in a single implementation pass.**
+
 ## Executive Summary
 
 This document outlines the complete migration plan for Claude Manager from its current Node.js/TypeScript backend to a Rust-based backend, packaged as a native desktop application using Tauri. This migration will provide:
@@ -79,18 +94,21 @@ This document outlines the complete migration plan for Claude Manager from its c
 **Tasks**:
 
 1. Install Tauri CLI and prerequisites
+
    ```bash
    cargo install create-tauri-app
    cargo install tauri-cli
    ```
 
 2. Initialize Tauri in existing project
+
    ```bash
    cd claude-manager
    cargo tauri init
    ```
 
 3. Configure `tauri.conf.json`:
+
    ```json
    {
      "build": {
@@ -371,6 +389,7 @@ impl From<AgentRow> for Agent {
 ```
 
 **Additional type files to create:**
+
 - `workspace.rs` - Workspace, WorkspaceRow, WorkspaceWithDetails
 - `worktree.rs` - Worktree, WorktreeRow, SortMode, WorktreeWithAgents
 - `message.rs` - Message, MessageRow, MessageRole
@@ -2024,46 +2043,42 @@ fn main() {
 **File: `src/lib/api.ts` (Modified)**
 
 ```typescript
-import { invoke } from '@tauri-apps/api/core';
+import { invoke } from '@tauri-apps/api/core'
 
 // Check if running in Tauri
-const isTauri = '__TAURI__' in window;
+const isTauri = '__TAURI__' in window
 
 // Fallback to HTTP for development without Tauri
-const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api';
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3001/api'
 
 async function tauriInvoke<T>(command: string, args?: Record<string, unknown>): Promise<T> {
   if (isTauri) {
-    return invoke<T>(command, args);
+    return invoke<T>(command, args)
   }
   // Fallback to HTTP API for non-Tauri development
-  throw new Error('Tauri not available');
+  throw new Error('Tauri not available')
 }
 
-async function request<T>(
-  method: string,
-  path: string,
-  body?: unknown
-): Promise<T> {
+async function request<T>(method: string, path: string, body?: unknown): Promise<T> {
   const response = await fetch(`${API_BASE}${path}`, {
     method,
     headers: {
       'Content-Type': 'application/json',
     },
     body: body ? JSON.stringify(body) : undefined,
-  });
+  })
 
   if (!response.ok) {
-    const error = await response.json();
+    const error = await response.json()
     throw new ApiError(
       error.error?.code || 'UNKNOWN_ERROR',
       error.error?.message || 'An error occurred',
       response.status,
       error.error?.details
-    );
+    )
   }
 
-  return response.json();
+  return response.json()
 }
 
 // Agent API - Uses Tauri commands when available
@@ -2073,51 +2088,51 @@ export const agents = {
       return tauriInvoke<{ agents: Agent[] }>('list_agents', {
         worktreeId: params?.worktreeId,
         includeDeleted: params?.includeDeleted,
-      });
+      })
     }
-    const query = new URLSearchParams();
-    if (params?.worktreeId) query.set('worktreeId', params.worktreeId);
-    if (params?.status) query.set('status', params.status);
-    if (params?.includeDeleted) query.set('includeDeleted', 'true');
-    return request<{ agents: Agent[] }>('GET', `/agents?${query}`);
+    const query = new URLSearchParams()
+    if (params?.worktreeId) query.set('worktreeId', params.worktreeId)
+    if (params?.status) query.set('status', params.status)
+    if (params?.includeDeleted) query.set('includeDeleted', 'true')
+    return request<{ agents: Agent[] }>('GET', `/agents?${query}`)
   },
 
   get: async (id: string) => {
     if (isTauri) {
-      return tauriInvoke<Agent>('get_agent', { id });
+      return tauriInvoke<Agent>('get_agent', { id })
     }
-    return request<Agent>('GET', `/agents/${id}`);
+    return request<Agent>('GET', `/agents/${id}`)
   },
 
   create: async (data: CreateAgentInput) => {
     if (isTauri) {
-      return tauriInvoke<Agent>('create_agent', { input: data });
+      return tauriInvoke<Agent>('create_agent', { input: data })
     }
-    return request<Agent>('POST', '/agents', data);
+    return request<Agent>('POST', '/agents', data)
   },
 
   start: async (id: string, worktreePath: string, initialPrompt?: string) => {
     if (isTauri) {
-      return tauriInvoke<Agent>('start_agent', { id, worktreePath, initialPrompt });
+      return tauriInvoke<Agent>('start_agent', { id, worktreePath, initialPrompt })
     }
-    return request<Agent>('POST', `/agents/${id}/start`, { initialPrompt });
+    return request<Agent>('POST', `/agents/${id}/start`, { initialPrompt })
   },
 
   stop: async (id: string, force?: boolean) => {
     if (isTauri) {
-      return tauriInvoke<Agent>('stop_agent', { id, force });
+      return tauriInvoke<Agent>('stop_agent', { id, force })
     }
-    return request<Agent>('POST', `/agents/${id}/stop?force=${force || false}`);
+    return request<Agent>('POST', `/agents/${id}/stop?force=${force || false}`)
   },
 
   sendMessage: async (id: string, content: string) => {
     if (isTauri) {
       return tauriInvoke<SendMessageResponse>('send_message_to_agent', {
         id,
-        input: { content }
-      });
+        input: { content },
+      })
     }
-    return request<SendMessageResponse>('POST', `/agents/${id}/message`, { content });
+    return request<SendMessageResponse>('POST', `/agents/${id}/message`, { content })
   },
 
   getMessages: async (id: string, params?: { limit?: number; before?: string }) => {
@@ -2126,28 +2141,28 @@ export const agents = {
         id,
         limit: params?.limit,
         before: params?.before,
-      });
+      })
     }
-    const query = new URLSearchParams();
-    if (params?.limit) query.set('limit', params.limit.toString());
-    if (params?.before) query.set('before', params.before);
-    return request<MessageListResponse>('GET', `/agents/${id}/messages?${query}`);
+    const query = new URLSearchParams()
+    if (params?.limit) query.set('limit', params.limit.toString())
+    if (params?.before) query.set('before', params.before)
+    return request<MessageListResponse>('GET', `/agents/${id}/messages?${query}`)
   },
 
   delete: async (id: string, archive?: boolean) => {
     if (isTauri) {
-      return tauriInvoke<void>('delete_agent', { id, archive });
+      return tauriInvoke<void>('delete_agent', { id, archive })
     }
-    return request<void>('DELETE', `/agents/${id}?archive=${archive ?? true}`);
+    return request<void>('DELETE', `/agents/${id}?archive=${archive ?? true}`)
   },
 
   fork: async (id: string, name?: string) => {
     if (isTauri) {
-      return tauriInvoke<Agent>('fork_agent', { id, name });
+      return tauriInvoke<Agent>('fork_agent', { id, name })
     }
-    return request<Agent>('POST', `/agents/${id}/fork`, { name });
+    return request<Agent>('POST', `/agents/${id}/fork`, { name })
   },
-};
+}
 
 // Similar patterns for workspaces, worktrees, usage...
 ```
@@ -2158,7 +2173,7 @@ export const agents = {
 
 ```typescript
 // WebSocket URL - same for both Tauri and browser
-const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws';
+const WS_URL = import.meta.env.VITE_WS_URL || 'ws://localhost:3001/ws'
 
 // The WebSocket client remains largely the same since the
 // Rust backend exposes the same WebSocket protocol
@@ -2504,20 +2519,1858 @@ async fn test_full_agent_lifecycle() {
 
 ---
 
+## Phase 9: Comprehensive Testing Strategy
+
+This phase details the complete testing approach for the Rust backend, ensuring feature parity with the existing 175+ Node.js tests.
+
+### 9.1 Rust Testing Stack
+
+| Crate            | Purpose                        | Version |
+| ---------------- | ------------------------------ | ------- |
+| `tokio-test`     | Async test utilities           | 0.4     |
+| `mockall`        | Trait mocking                  | 0.12    |
+| `tempfile`       | Temporary test directories     | 3.x     |
+| `wiremock`       | HTTP mocking for external APIs | 0.6     |
+| `fake`           | Test data generation           | 2.x     |
+| `test-log`       | Logging in tests               | 0.2     |
+| `rstest`         | Parameterized testing          | 0.18    |
+| `assert_matches` | Pattern matching assertions    | 1.5     |
+| `criterion`      | Benchmarking                   | 0.5     |
+
+**Add to `Cargo.toml`:**
+
+```toml
+[dev-dependencies]
+tokio-test = "0.4"
+mockall = "0.12"
+tempfile = "3"
+wiremock = "0.6"
+fake = { version = "2", features = ["derive", "chrono"] }
+test-log = { version = "0.2", features = ["trace"] }
+rstest = "0.18"
+assert_matches = "1.5"
+criterion = { version = "0.5", features = ["async_tokio"] }
+serial_test = "3"
+
+[[bench]]
+name = "agent_benchmarks"
+harness = false
+```
+
+### 9.2 Test Directory Structure
+
+```
+src-tauri/
+├── src/
+│   ├── db/
+│   │   ├── repositories/
+│   │   │   └── agent_repository.rs      # Contains #[cfg(test)] mod tests
+│   │   └── mod.rs
+│   ├── services/
+│   │   ├── agent_service.rs             # Contains #[cfg(test)] mod tests
+│   │   ├── process_service.rs
+│   │   └── mod.rs
+│   └── ...
+├── tests/                                # Integration tests
+│   ├── common/
+│   │   ├── mod.rs                        # Shared test utilities
+│   │   ├── fixtures.rs                   # Test data factories
+│   │   └── mocks.rs                      # Mock implementations
+│   ├── api/
+│   │   ├── agent_commands_test.rs
+│   │   ├── workspace_commands_test.rs
+│   │   └── worktree_commands_test.rs
+│   ├── websocket/
+│   │   └── streaming_test.rs
+│   ├── database/
+│   │   └── migrations_test.rs
+│   └── e2e/
+│       ├── agent_lifecycle_test.rs
+│       └── full_workflow_test.rs
+└── benches/
+    └── agent_benchmarks.rs
+```
+
+### 9.3 Coverage Requirements
+
+| Category          | Minimum | Target | Critical Paths |
+| ----------------- | ------- | ------ | -------------- |
+| Unit Tests        | 80%     | 90%    | 95%+           |
+| Integration Tests | 70%     | 80%    | 90%+           |
+| Overall           | 75%     | 85%    | -              |
+
+**Critical Paths (Must Have 95%+ Coverage):**
+
+1. Agent spawning and lifecycle management
+2. Message send/receive flow
+3. Git worktree operations
+4. Database migrations
+5. WebSocket connection handling
+6. Error handling and recovery
+7. Process manager (spawn, stop, signal handling)
+
+### 9.4 Test Setup Infrastructure
+
+**File: `tests/common/mod.rs`**
+
+```rust
+use rusqlite::Connection;
+use std::sync::Arc;
+use tempfile::{tempdir, TempDir};
+use tokio::sync::RwLock;
+
+use claude_manager_lib::db::{init_database, DbPool};
+use claude_manager_lib::services::ProcessManager;
+
+pub mod fixtures;
+pub mod mocks;
+
+/// Test context that holds all resources needed for testing
+pub struct TestContext {
+    pub pool: DbPool,
+    pub process_manager: Arc<ProcessManager>,
+    pub temp_dir: TempDir,
+    pub workspace_id: String,
+    pub worktree_id: String,
+}
+
+impl TestContext {
+    /// Create a new test context with fresh database
+    pub fn new() -> Self {
+        let temp_dir = tempdir().expect("Failed to create temp dir");
+        let pool = init_database(temp_dir.path().to_path_buf())
+            .expect("Failed to init test database");
+
+        let process_manager = Arc::new(ProcessManager::new("echo".to_string())); // Mock CLI
+
+        // Create default workspace and worktree
+        let conn = pool.get().expect("Failed to get connection");
+        conn.execute(
+            "INSERT INTO workspaces (id, name, path) VALUES (?1, ?2, ?3)",
+            ["ws_test", "Test Workspace", temp_dir.path().to_str().unwrap()],
+        ).expect("Failed to create test workspace");
+
+        conn.execute(
+            "INSERT INTO worktrees (id, workspace_id, name, branch, path) VALUES (?1, ?2, ?3, ?4, ?5)",
+            ["wt_test", "ws_test", "main", "main", temp_dir.path().to_str().unwrap()],
+        ).expect("Failed to create test worktree");
+
+        Self {
+            pool,
+            process_manager,
+            temp_dir,
+            workspace_id: "ws_test".to_string(),
+            worktree_id: "wt_test".to_string(),
+        }
+    }
+
+    /// Clear all data from tables (for test isolation)
+    pub fn clear_tables(&self) {
+        let conn = self.pool.get().expect("Failed to get connection");
+        conn.execute_batch(r#"
+            DELETE FROM messages;
+            DELETE FROM agent_sessions;
+            DELETE FROM agents;
+            DELETE FROM worktrees;
+            DELETE FROM workspaces;
+        "#).expect("Failed to clear tables");
+    }
+
+    /// Re-insert default workspace/worktree after clearing
+    pub fn reset(&self) {
+        self.clear_tables();
+        let conn = self.pool.get().expect("Failed to get connection");
+        conn.execute(
+            "INSERT INTO workspaces (id, name, path) VALUES (?1, ?2, ?3)",
+            ["ws_test", "Test Workspace", self.temp_dir.path().to_str().unwrap()],
+        ).expect("Failed to create test workspace");
+
+        conn.execute(
+            "INSERT INTO worktrees (id, workspace_id, name, branch, path) VALUES (?1, ?2, ?3, ?4, ?5)",
+            ["wt_test", "ws_test", "main", "main", self.temp_dir.path().to_str().unwrap()],
+        ).expect("Failed to create test worktree");
+    }
+}
+
+/// Initialize test logging (call once per test module)
+pub fn init_test_logging() {
+    let _ = tracing_subscriber::fmt()
+        .with_test_writer()
+        .with_max_level(tracing::Level::DEBUG)
+        .try_init();
+}
+```
+
+**File: `tests/common/fixtures.rs`**
+
+```rust
+use chrono::Utc;
+use fake::{Fake, Faker};
+use uuid::Uuid;
+
+use claude_manager_lib::types::{
+    Agent, AgentMode, AgentStatus, Permission, Message, MessageRole,
+    Workspace, Worktree, SortMode,
+};
+
+/// Factory for creating test agents
+pub struct AgentFactory;
+
+impl AgentFactory {
+    pub fn create() -> AgentBuilder {
+        AgentBuilder::default()
+    }
+
+    pub fn running() -> AgentBuilder {
+        AgentBuilder::default()
+            .status(AgentStatus::Running)
+            .pid(Some(12345))
+    }
+
+    pub fn waiting() -> AgentBuilder {
+        AgentBuilder::default()
+            .status(AgentStatus::Waiting)
+    }
+
+    pub fn with_context(level: i32) -> AgentBuilder {
+        AgentBuilder::default()
+            .context_level(level)
+    }
+}
+
+#[derive(Default)]
+pub struct AgentBuilder {
+    id: Option<String>,
+    worktree_id: Option<String>,
+    name: Option<String>,
+    status: Option<AgentStatus>,
+    context_level: Option<i32>,
+    mode: Option<AgentMode>,
+    permissions: Option<Vec<Permission>>,
+    pid: Option<i32>,
+}
+
+impl AgentBuilder {
+    pub fn id(mut self, id: impl Into<String>) -> Self {
+        self.id = Some(id.into());
+        self
+    }
+
+    pub fn worktree_id(mut self, id: impl Into<String>) -> Self {
+        self.worktree_id = Some(id.into());
+        self
+    }
+
+    pub fn name(mut self, name: impl Into<String>) -> Self {
+        self.name = Some(name.into());
+        self
+    }
+
+    pub fn status(mut self, status: AgentStatus) -> Self {
+        self.status = Some(status);
+        self
+    }
+
+    pub fn context_level(mut self, level: i32) -> Self {
+        self.context_level = Some(level);
+        self
+    }
+
+    pub fn mode(mut self, mode: AgentMode) -> Self {
+        self.mode = Some(mode);
+        self
+    }
+
+    pub fn permissions(mut self, perms: Vec<Permission>) -> Self {
+        self.permissions = Some(perms);
+        self
+    }
+
+    pub fn pid(mut self, pid: Option<i32>) -> Self {
+        self.pid = pid;
+        self
+    }
+
+    pub fn build(self) -> Agent {
+        let now = Utc::now().to_rfc3339();
+        Agent {
+            id: self.id.unwrap_or_else(|| format!("ag_{}", &Uuid::new_v4().to_string()[..8])),
+            worktree_id: self.worktree_id.unwrap_or_else(|| "wt_test".to_string()),
+            name: self.name.unwrap_or_else(|| format!("Agent {}", Faker.fake::<u16>())),
+            status: self.status.unwrap_or(AgentStatus::Finished),
+            context_level: self.context_level.unwrap_or(0),
+            mode: self.mode.unwrap_or(AgentMode::Regular),
+            permissions: self.permissions.unwrap_or_else(|| vec![Permission::Read]),
+            display_order: 0,
+            pid: self.pid,
+            session_id: None,
+            created_at: now.clone(),
+            updated_at: now,
+            started_at: None,
+            stopped_at: None,
+            deleted_at: None,
+            parent_agent_id: None,
+        }
+    }
+}
+
+/// Factory for creating test messages
+pub struct MessageFactory;
+
+impl MessageFactory {
+    pub fn user_message(agent_id: &str, content: &str) -> Message {
+        Message {
+            id: format!("msg_{}", &Uuid::new_v4().to_string()[..8]),
+            agent_id: agent_id.to_string(),
+            role: MessageRole::User,
+            content: content.to_string(),
+            token_count: None,
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            created_at: Utc::now().to_rfc3339(),
+            is_complete: true,
+        }
+    }
+
+    pub fn assistant_message(agent_id: &str, content: &str) -> Message {
+        Message {
+            id: format!("msg_{}", &Uuid::new_v4().to_string()[..8]),
+            agent_id: agent_id.to_string(),
+            role: MessageRole::Assistant,
+            content: content.to_string(),
+            token_count: Some(content.len() as i32 / 4), // Rough estimate
+            tool_name: None,
+            tool_input: None,
+            tool_output: None,
+            created_at: Utc::now().to_rfc3339(),
+            is_complete: true,
+        }
+    }
+
+    pub fn tool_message(agent_id: &str, tool_name: &str, output: &str) -> Message {
+        Message {
+            id: format!("msg_{}", &Uuid::new_v4().to_string()[..8]),
+            agent_id: agent_id.to_string(),
+            role: MessageRole::Tool,
+            content: output.to_string(),
+            token_count: None,
+            tool_name: Some(tool_name.to_string()),
+            tool_input: Some("{}".to_string()),
+            tool_output: Some(output.to_string()),
+            created_at: Utc::now().to_rfc3339(),
+            is_complete: true,
+        }
+    }
+}
+```
+
+**File: `tests/common/mocks.rs`**
+
+```rust
+use async_trait::async_trait;
+use mockall::mock;
+use std::collections::HashMap;
+use std::sync::Arc;
+use parking_lot::RwLock;
+use tokio::sync::broadcast;
+
+use claude_manager_lib::services::{ProcessError, ProcessEvent};
+use claude_manager_lib::types::{AgentMode, Permission, AgentStatus};
+
+/// Mock process manager for testing without spawning real processes
+pub struct MockProcessManager {
+    running: Arc<RwLock<HashMap<String, u32>>>,
+    event_tx: broadcast::Sender<ProcessEvent>,
+}
+
+impl MockProcessManager {
+    pub fn new() -> Self {
+        let (event_tx, _) = broadcast::channel(100);
+        Self {
+            running: Arc::new(RwLock::new(HashMap::new())),
+            event_tx,
+        }
+    }
+
+    pub fn subscribe(&self) -> broadcast::Receiver<ProcessEvent> {
+        self.event_tx.subscribe()
+    }
+
+    pub fn spawn_agent(
+        &self,
+        agent_id: &str,
+        _worktree_path: &str,
+        _mode: AgentMode,
+        _permissions: &[Permission],
+        _initial_prompt: Option<&str>,
+        _session_id: Option<&str>,
+    ) -> Result<u32, ProcessError> {
+        let pid = rand::random::<u32>() % 65536;
+        self.running.write().insert(agent_id.to_string(), pid);
+
+        let _ = self.event_tx.send(ProcessEvent::Status {
+            agent_id: agent_id.to_string(),
+            status: AgentStatus::Running,
+            reason: None,
+        });
+
+        Ok(pid)
+    }
+
+    pub fn stop_agent(&self, agent_id: &str, _force: bool) -> Result<(), ProcessError> {
+        self.running.write().remove(agent_id);
+
+        let _ = self.event_tx.send(ProcessEvent::Exit {
+            agent_id: agent_id.to_string(),
+            code: Some(0),
+            signal: None,
+        });
+
+        Ok(())
+    }
+
+    pub fn is_running(&self, agent_id: &str) -> bool {
+        self.running.read().contains_key(agent_id)
+    }
+
+    pub fn send_message(&self, agent_id: &str, content: &str) -> Result<(), ProcessError> {
+        if !self.is_running(agent_id) {
+            return Err(ProcessError::AgentNotFound(agent_id.to_string()));
+        }
+
+        // Simulate immediate echo response
+        let _ = self.event_tx.send(ProcessEvent::Output {
+            agent_id: agent_id.to_string(),
+            content: format!("Received: {}", content),
+            is_complete: false,
+        });
+
+        Ok(())
+    }
+
+    /// Simulate agent output for testing
+    pub fn simulate_output(&self, agent_id: &str, content: &str) {
+        let _ = self.event_tx.send(ProcessEvent::Output {
+            agent_id: agent_id.to_string(),
+            content: content.to_string(),
+            is_complete: false,
+        });
+    }
+
+    /// Simulate status change for testing
+    pub fn simulate_status(&self, agent_id: &str, status: AgentStatus) {
+        let _ = self.event_tx.send(ProcessEvent::Status {
+            agent_id: agent_id.to_string(),
+            status,
+            reason: None,
+        });
+    }
+
+    /// Simulate context level update
+    pub fn simulate_context_update(&self, agent_id: &str, level: i32) {
+        let _ = self.event_tx.send(ProcessEvent::Context {
+            agent_id: agent_id.to_string(),
+            level,
+        });
+    }
+}
+
+/// Mock Git repository for testing without real git operations
+pub struct MockGitRepo {
+    pub path: String,
+    pub branches: Vec<String>,
+    pub current_branch: String,
+    pub worktrees: Vec<(String, String)>, // (path, branch)
+}
+
+impl MockGitRepo {
+    pub fn new(path: &str) -> Self {
+        Self {
+            path: path.to_string(),
+            branches: vec!["main".to_string()],
+            current_branch: "main".to_string(),
+            worktrees: vec![(path.to_string(), "main".to_string())],
+        }
+    }
+
+    pub fn with_branches(mut self, branches: Vec<&str>) -> Self {
+        self.branches = branches.into_iter().map(|s| s.to_string()).collect();
+        self
+    }
+
+    pub fn is_valid(&self) -> bool {
+        true
+    }
+
+    pub fn get_current_branch(&self) -> String {
+        self.current_branch.clone()
+    }
+
+    pub fn list_worktrees(&self) -> Vec<(String, String, bool)> {
+        self.worktrees
+            .iter()
+            .enumerate()
+            .map(|(i, (path, branch))| (path.clone(), branch.clone(), i == 0))
+            .collect()
+    }
+}
+```
+
+### 9.5 Unit Tests
+
+**File: `src-tauri/src/db/repositories/agent_repository.rs` (test module)**
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use tempfile::tempdir;
+    use crate::db::init_database;
+
+    fn setup() -> (DbPool, String) {
+        let dir = tempdir().unwrap();
+        let pool = init_database(dir.path().to_path_buf()).unwrap();
+
+        // Create test worktree
+        let conn = pool.get().unwrap();
+        conn.execute(
+            "INSERT INTO workspaces (id, name, path) VALUES ('ws_test', 'Test', '/tmp/test')",
+            [],
+        ).unwrap();
+        conn.execute(
+            "INSERT INTO worktrees (id, workspace_id, name, branch, path) VALUES ('wt_test', 'ws_test', 'main', 'main', '/tmp/test')",
+            [],
+        ).unwrap();
+
+        (pool, dir.path().to_string_lossy().to_string())
+    }
+
+    mod create {
+        use super::*;
+
+        #[test]
+        fn creates_agent_with_generated_id() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let agent = Agent {
+                id: "".to_string(), // Will be overwritten
+                worktree_id: "wt_test".to_string(),
+                name: "Test Agent".to_string(),
+                status: AgentStatus::Finished,
+                context_level: 0,
+                mode: AgentMode::Regular,
+                permissions: vec![Permission::Read],
+                display_order: 0,
+                pid: None,
+                session_id: None,
+                created_at: chrono::Utc::now().to_rfc3339(),
+                updated_at: chrono::Utc::now().to_rfc3339(),
+                started_at: None,
+                stopped_at: None,
+                deleted_at: None,
+                parent_agent_id: None,
+            };
+
+            let created = repo.create(&agent).unwrap();
+            assert!(created.id.starts_with("ag_"));
+            assert_eq!(created.name, "Test Agent");
+        }
+
+        #[test]
+        fn auto_increments_display_order() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let agent1 = repo.create(&Agent {
+                id: "".to_string(),
+                worktree_id: "wt_test".to_string(),
+                name: "Agent 1".to_string(),
+                status: AgentStatus::Finished,
+                ..Default::default()
+            }).unwrap();
+
+            let agent2 = repo.create(&Agent {
+                id: "".to_string(),
+                worktree_id: "wt_test".to_string(),
+                name: "Agent 2".to_string(),
+                status: AgentStatus::Finished,
+                ..Default::default()
+            }).unwrap();
+
+            assert_eq!(agent1.display_order, 0);
+            assert_eq!(agent2.display_order, 1);
+        }
+    }
+
+    mod find_by_id {
+        use super::*;
+
+        #[test]
+        fn returns_none_for_nonexistent() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let result = repo.find_by_id("ag_nonexistent").unwrap();
+            assert!(result.is_none());
+        }
+
+        #[test]
+        fn returns_agent_by_id() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let created = repo.create(&Agent {
+                id: "".to_string(),
+                worktree_id: "wt_test".to_string(),
+                name: "Find Me".to_string(),
+                status: AgentStatus::Finished,
+                ..Default::default()
+            }).unwrap();
+
+            let found = repo.find_by_id(&created.id).unwrap().unwrap();
+            assert_eq!(found.name, "Find Me");
+        }
+    }
+
+    mod find_by_worktree_id {
+        use super::*;
+
+        #[test]
+        fn returns_empty_for_no_agents() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let agents = repo.find_by_worktree_id("wt_test", false).unwrap();
+            assert!(agents.is_empty());
+        }
+
+        #[test]
+        fn excludes_soft_deleted_by_default() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let agent = repo.create(&Agent {
+                id: "".to_string(),
+                worktree_id: "wt_test".to_string(),
+                name: "To Delete".to_string(),
+                status: AgentStatus::Finished,
+                ..Default::default()
+            }).unwrap();
+
+            repo.soft_delete(&agent.id).unwrap();
+
+            let agents = repo.find_by_worktree_id("wt_test", false).unwrap();
+            assert!(agents.is_empty());
+        }
+
+        #[test]
+        fn includes_soft_deleted_when_requested() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let agent = repo.create(&Agent {
+                id: "".to_string(),
+                worktree_id: "wt_test".to_string(),
+                name: "Deleted".to_string(),
+                status: AgentStatus::Finished,
+                ..Default::default()
+            }).unwrap();
+
+            repo.soft_delete(&agent.id).unwrap();
+
+            let agents = repo.find_by_worktree_id("wt_test", true).unwrap();
+            assert_eq!(agents.len(), 1);
+            assert!(agents[0].deleted_at.is_some());
+        }
+
+        #[test]
+        fn returns_ordered_by_display_order() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            for name in &["C", "A", "B"] {
+                repo.create(&Agent {
+                    id: "".to_string(),
+                    worktree_id: "wt_test".to_string(),
+                    name: name.to_string(),
+                    status: AgentStatus::Finished,
+                    ..Default::default()
+                }).unwrap();
+            }
+
+            let agents = repo.find_by_worktree_id("wt_test", false).unwrap();
+            assert_eq!(agents[0].name, "C"); // First created
+            assert_eq!(agents[1].name, "A");
+            assert_eq!(agents[2].name, "B");
+        }
+    }
+
+    mod update_status {
+        use super::*;
+
+        #[test]
+        fn updates_status_and_pid() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let agent = repo.create(&Agent {
+                id: "".to_string(),
+                worktree_id: "wt_test".to_string(),
+                name: "Test".to_string(),
+                status: AgentStatus::Finished,
+                ..Default::default()
+            }).unwrap();
+
+            repo.update_status(&agent.id, AgentStatus::Running, Some(12345)).unwrap();
+
+            let updated = repo.find_by_id(&agent.id).unwrap().unwrap();
+            assert_eq!(updated.status, AgentStatus::Running);
+            assert_eq!(updated.pid, Some(12345));
+        }
+    }
+
+    mod soft_delete {
+        use super::*;
+
+        #[test]
+        fn sets_deleted_at_timestamp() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let agent = repo.create(&Agent {
+                id: "".to_string(),
+                worktree_id: "wt_test".to_string(),
+                name: "Test".to_string(),
+                status: AgentStatus::Running,
+                pid: Some(12345),
+                ..Default::default()
+            }).unwrap();
+
+            repo.soft_delete(&agent.id).unwrap();
+
+            let deleted = repo.find_by_id(&agent.id).unwrap().unwrap();
+            assert!(deleted.deleted_at.is_some());
+            assert_eq!(deleted.status, AgentStatus::Finished);
+            assert!(deleted.pid.is_none());
+        }
+    }
+
+    mod reorder {
+        use super::*;
+
+        #[test]
+        fn updates_display_order_based_on_array_position() {
+            let (pool, _) = setup();
+            let repo = AgentRepository::new(pool);
+
+            let a1 = repo.create(&Agent {
+                worktree_id: "wt_test".to_string(),
+                name: "A".to_string(),
+                ..Default::default()
+            }).unwrap();
+            let a2 = repo.create(&Agent {
+                worktree_id: "wt_test".to_string(),
+                name: "B".to_string(),
+                ..Default::default()
+            }).unwrap();
+            let a3 = repo.create(&Agent {
+                worktree_id: "wt_test".to_string(),
+                name: "C".to_string(),
+                ..Default::default()
+            }).unwrap();
+
+            // Reorder: C, A, B
+            repo.reorder("wt_test", &[a3.id.clone(), a1.id.clone(), a2.id.clone()]).unwrap();
+
+            let agents = repo.find_by_worktree_id("wt_test", false).unwrap();
+            assert_eq!(agents[0].name, "C");
+            assert_eq!(agents[1].name, "A");
+            assert_eq!(agents[2].name, "B");
+        }
+    }
+}
+```
+
+**File: `src-tauri/src/services/agent_service.rs` (test module)**
+
+```rust
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::tests::common::{TestContext, fixtures::AgentFactory};
+    use std::sync::Arc;
+
+    fn setup() -> (AgentService, TestContext) {
+        let ctx = TestContext::new();
+        let service = AgentService::new(ctx.pool.clone(), ctx.process_manager.clone());
+        (service, ctx)
+    }
+
+    mod create_agent {
+        use super::*;
+
+        #[test]
+        fn creates_with_defaults() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                Some("Test Agent".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            assert!(agent.id.starts_with("ag_"));
+            assert_eq!(agent.name, "Test Agent");
+            assert_eq!(agent.status, AgentStatus::Finished);
+            assert_eq!(agent.context_level, 0);
+        }
+
+        #[test]
+        fn auto_generates_name_when_not_provided() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                None,
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            assert!(agent.name.starts_with("Agent "));
+        }
+
+        #[test]
+        fn fails_for_invalid_worktree() {
+            let (service, _) = setup();
+
+            let result = service.create_agent(
+                "wt_nonexistent",
+                Some("Test".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            );
+
+            assert!(matches!(result, Err(AgentError::NotFound(_))));
+        }
+    }
+
+    mod start_agent {
+        use super::*;
+
+        #[tokio::test]
+        async fn starts_agent_and_updates_status() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                Some("Test".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            let started = service.start_agent(
+                &agent.id,
+                ctx.temp_dir.path().to_str().unwrap(),
+                None,
+            ).unwrap();
+
+            assert_eq!(started.status, AgentStatus::Running);
+            assert!(started.pid.is_some());
+        }
+
+        #[tokio::test]
+        async fn fails_for_already_running() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                Some("Test".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            service.start_agent(
+                &agent.id,
+                ctx.temp_dir.path().to_str().unwrap(),
+                None,
+            ).unwrap();
+
+            let result = service.start_agent(
+                &agent.id,
+                ctx.temp_dir.path().to_str().unwrap(),
+                None,
+            );
+
+            assert!(matches!(result, Err(AgentError::Process(_))));
+        }
+    }
+
+    mod stop_agent {
+        use super::*;
+
+        #[tokio::test]
+        async fn stops_running_agent() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                Some("Test".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            service.start_agent(
+                &agent.id,
+                ctx.temp_dir.path().to_str().unwrap(),
+                None,
+            ).unwrap();
+
+            let stopped = service.stop_agent(&agent.id, false).unwrap();
+
+            assert_eq!(stopped.status, AgentStatus::Finished);
+            assert!(stopped.pid.is_none());
+        }
+    }
+
+    mod fork_agent {
+        use super::*;
+
+        #[test]
+        fn creates_copy_with_same_settings() {
+            let (service, ctx) = setup();
+
+            let original = service.create_agent(
+                &ctx.worktree_id,
+                Some("Original".to_string()),
+                AgentMode::Auto,
+                vec![Permission::Read, Permission::Write],
+            ).unwrap();
+
+            let forked = service.fork_agent(&original.id, None).unwrap();
+
+            assert_ne!(forked.id, original.id);
+            assert_eq!(forked.name, "Original (fork)");
+            assert_eq!(forked.mode, AgentMode::Auto);
+            assert_eq!(forked.permissions, vec![Permission::Read, Permission::Write]);
+            assert_eq!(forked.parent_agent_id, Some(original.id));
+        }
+
+        #[test]
+        fn allows_custom_name() {
+            let (service, ctx) = setup();
+
+            let original = service.create_agent(
+                &ctx.worktree_id,
+                Some("Original".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            let forked = service.fork_agent(&original.id, Some("Custom Fork".to_string())).unwrap();
+
+            assert_eq!(forked.name, "Custom Fork");
+        }
+    }
+
+    mod delete_agent {
+        use super::*;
+
+        #[test]
+        fn soft_deletes_by_default() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                Some("Test".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            service.delete_agent(&agent.id, true).unwrap();
+
+            // Should still be retrievable
+            let found = service.get_agent(&agent.id).unwrap();
+            assert!(found.deleted_at.is_some());
+        }
+
+        #[test]
+        fn hard_deletes_when_archive_false() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                Some("Test".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            service.delete_agent(&agent.id, false).unwrap();
+
+            let result = service.get_agent(&agent.id);
+            assert!(matches!(result, Err(AgentError::NotFound(_))));
+        }
+
+        #[tokio::test]
+        async fn stops_running_agent_before_delete() {
+            let (service, ctx) = setup();
+
+            let agent = service.create_agent(
+                &ctx.worktree_id,
+                Some("Test".to_string()),
+                AgentMode::Regular,
+                vec![Permission::Read],
+            ).unwrap();
+
+            service.start_agent(
+                &agent.id,
+                ctx.temp_dir.path().to_str().unwrap(),
+                None,
+            ).unwrap();
+
+            service.delete_agent(&agent.id, true).unwrap();
+
+            assert!(!ctx.process_manager.is_running(&agent.id));
+        }
+    }
+}
+```
+
+### 9.6 Integration Tests
+
+**File: `tests/api/agent_commands_test.rs`**
+
+```rust
+use serial_test::serial;
+use tauri::test::{mock_builder, MockRuntime};
+use claude_manager_lib::commands::*;
+
+mod common;
+use common::{TestContext, fixtures::AgentFactory};
+
+fn setup_app() -> tauri::App<MockRuntime> {
+    mock_builder()
+        .invoke_handler(tauri::generate_handler![
+            list_agents,
+            get_agent,
+            create_agent,
+            start_agent,
+            stop_agent,
+            delete_agent,
+            send_message_to_agent,
+            get_agent_messages,
+            fork_agent,
+        ])
+        .build()
+        .unwrap()
+}
+
+#[tokio::test]
+#[serial]
+async fn test_create_agent_command() {
+    let ctx = TestContext::new();
+    let app = setup_app();
+
+    let input = CreateAgentInput {
+        worktree_id: ctx.worktree_id.clone(),
+        name: Some("Test Agent".to_string()),
+        mode: Some(AgentMode::Regular),
+        permissions: Some(vec![Permission::Read]),
+        initial_prompt: None,
+    };
+
+    let result: Agent = tauri::test::invoke_command(&app, "create_agent", input).await.unwrap();
+
+    assert!(result.id.starts_with("ag_"));
+    assert_eq!(result.name, "Test Agent");
+}
+
+#[tokio::test]
+#[serial]
+async fn test_list_agents_command() {
+    let ctx = TestContext::new();
+    let app = setup_app();
+
+    // Create some agents first
+    for name in ["Agent 1", "Agent 2", "Agent 3"] {
+        let input = CreateAgentInput {
+            worktree_id: ctx.worktree_id.clone(),
+            name: Some(name.to_string()),
+            mode: None,
+            permissions: None,
+            initial_prompt: None,
+        };
+        let _: Agent = tauri::test::invoke_command(&app, "create_agent", input).await.unwrap();
+    }
+
+    let result: AgentListResponse = tauri::test::invoke_command(
+        &app,
+        "list_agents",
+        serde_json::json!({
+            "worktreeId": ctx.worktree_id,
+            "includeDeleted": false
+        }),
+    ).await.unwrap();
+
+    assert_eq!(result.agents.len(), 3);
+}
+
+#[tokio::test]
+#[serial]
+async fn test_agent_lifecycle_command() {
+    let ctx = TestContext::new();
+    let app = setup_app();
+
+    // Create
+    let input = CreateAgentInput {
+        worktree_id: ctx.worktree_id.clone(),
+        name: Some("Lifecycle Test".to_string()),
+        mode: Some(AgentMode::Regular),
+        permissions: Some(vec![Permission::Read]),
+        initial_prompt: None,
+    };
+    let created: Agent = tauri::test::invoke_command(&app, "create_agent", input).await.unwrap();
+    assert_eq!(created.status, AgentStatus::Finished);
+
+    // Start
+    let started: Agent = tauri::test::invoke_command(
+        &app,
+        "start_agent",
+        serde_json::json!({
+            "id": created.id,
+            "worktreePath": ctx.temp_dir.path().to_str().unwrap(),
+        }),
+    ).await.unwrap();
+    assert_eq!(started.status, AgentStatus::Running);
+
+    // Stop
+    let stopped: Agent = tauri::test::invoke_command(
+        &app,
+        "stop_agent",
+        serde_json::json!({
+            "id": created.id,
+            "force": false,
+        }),
+    ).await.unwrap();
+    assert_eq!(stopped.status, AgentStatus::Finished);
+
+    // Delete
+    let _: () = tauri::test::invoke_command(
+        &app,
+        "delete_agent",
+        serde_json::json!({
+            "id": created.id,
+            "archive": true,
+        }),
+    ).await.unwrap();
+
+    // Verify deleted
+    let list: AgentListResponse = tauri::test::invoke_command(
+        &app,
+        "list_agents",
+        serde_json::json!({
+            "worktreeId": ctx.worktree_id,
+            "includeDeleted": false,
+        }),
+    ).await.unwrap();
+    assert!(list.agents.is_empty());
+}
+```
+
+**File: `tests/websocket/streaming_test.rs`**
+
+```rust
+use axum::Router;
+use tokio::net::TcpListener;
+use tokio_tungstenite::{connect_async, tungstenite::Message};
+use futures::{SinkExt, StreamExt};
+use std::time::Duration;
+
+mod common;
+use common::TestContext;
+
+async fn spawn_test_server() -> String {
+    let ctx = TestContext::new();
+    let ws_server = Arc::new(WebSocketServer::new(ctx.process_manager.subscribe()));
+    let router = ws_server.router();
+
+    let listener = TcpListener::bind("127.0.0.1:0").await.unwrap();
+    let addr = listener.local_addr().unwrap();
+
+    tokio::spawn(async move {
+        axum::serve(listener, router).await.ok();
+    });
+
+    format!("ws://127.0.0.1:{}/ws", addr.port())
+}
+
+#[tokio::test]
+async fn test_websocket_ping_pong() {
+    let url = spawn_test_server().await;
+    let (mut ws, _) = connect_async(&url).await.unwrap();
+
+    // Send ping
+    ws.send(Message::Text(r#"{"type":"ping"}"#.to_string())).await.unwrap();
+
+    // Receive pong
+    let msg = tokio::time::timeout(Duration::from_secs(5), ws.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let response: serde_json::Value = serde_json::from_str(&msg.to_string()).unwrap();
+    assert_eq!(response["type"], "pong");
+    assert!(response["timestamp"].is_string());
+}
+
+#[tokio::test]
+async fn test_websocket_agent_subscription() {
+    let ctx = TestContext::new();
+    let url = spawn_test_server().await;
+    let (mut ws, _) = connect_async(&url).await.unwrap();
+
+    // Subscribe to agent
+    ws.send(Message::Text(r#"{"type":"subscribe:agent","payload":{"agentId":"ag_test123"}}"#.to_string()))
+        .await
+        .unwrap();
+
+    // Simulate agent output
+    ctx.process_manager.simulate_output("ag_test123", "Hello from agent");
+
+    // Should receive output event
+    let msg = tokio::time::timeout(Duration::from_secs(5), ws.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let response: serde_json::Value = serde_json::from_str(&msg.to_string()).unwrap();
+    assert_eq!(response["type"], "agent:output");
+    assert_eq!(response["payload"]["content"], "Hello from agent");
+}
+
+#[tokio::test]
+async fn test_websocket_status_updates() {
+    let ctx = TestContext::new();
+    let url = spawn_test_server().await;
+    let (mut ws, _) = connect_async(&url).await.unwrap();
+
+    // Subscribe
+    ws.send(Message::Text(r#"{"type":"subscribe:agent","payload":{"agentId":"ag_status"}}"#.to_string()))
+        .await
+        .unwrap();
+
+    // Simulate status change
+    ctx.process_manager.simulate_status("ag_status", AgentStatus::Waiting);
+
+    let msg = tokio::time::timeout(Duration::from_secs(5), ws.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let response: serde_json::Value = serde_json::from_str(&msg.to_string()).unwrap();
+    assert_eq!(response["type"], "agent:status");
+    assert_eq!(response["payload"]["status"], "waiting");
+}
+
+#[tokio::test]
+async fn test_websocket_context_updates() {
+    let ctx = TestContext::new();
+    let url = spawn_test_server().await;
+    let (mut ws, _) = connect_async(&url).await.unwrap();
+
+    // Subscribe
+    ws.send(Message::Text(r#"{"type":"subscribe:agent","payload":{"agentId":"ag_context"}}"#.to_string()))
+        .await
+        .unwrap();
+
+    // Simulate context update
+    ctx.process_manager.simulate_context_update("ag_context", 75);
+
+    let msg = tokio::time::timeout(Duration::from_secs(5), ws.next())
+        .await
+        .unwrap()
+        .unwrap()
+        .unwrap();
+
+    let response: serde_json::Value = serde_json::from_str(&msg.to_string()).unwrap();
+    assert_eq!(response["type"], "agent:context");
+    assert_eq!(response["payload"]["level"], 75);
+}
+```
+
+**File: `tests/database/migrations_test.rs`**
+
+```rust
+use tempfile::tempdir;
+use rusqlite::Connection;
+use claude_manager_lib::db::{init_database, migrations::run_migrations};
+
+#[test]
+fn test_migrations_run_idempotently() {
+    let dir = tempdir().unwrap();
+    let db_path = dir.path().join("test.db");
+
+    // Run migrations twice
+    {
+        let conn = Connection::open(&db_path).unwrap();
+        run_migrations(&conn).unwrap();
+    }
+    {
+        let conn = Connection::open(&db_path).unwrap();
+        run_migrations(&conn).unwrap(); // Should not fail
+    }
+
+    // Verify schema
+    let conn = Connection::open(&db_path).unwrap();
+    let tables: Vec<String> = conn
+        .prepare("SELECT name FROM sqlite_master WHERE type='table' ORDER BY name")
+        .unwrap()
+        .query_map([], |row| row.get(0))
+        .unwrap()
+        .filter_map(|r| r.ok())
+        .collect();
+
+    assert!(tables.contains(&"agents".to_string()));
+    assert!(tables.contains(&"workspaces".to_string()));
+    assert!(tables.contains(&"worktrees".to_string()));
+    assert!(tables.contains(&"messages".to_string()));
+    assert!(tables.contains(&"schema_migrations".to_string()));
+}
+
+#[test]
+fn test_foreign_keys_enabled() {
+    let dir = tempdir().unwrap();
+    let pool = init_database(dir.path().to_path_buf()).unwrap();
+    let conn = pool.get().unwrap();
+
+    let fk_enabled: i32 = conn
+        .query_row("PRAGMA foreign_keys", [], |row| row.get(0))
+        .unwrap();
+
+    assert_eq!(fk_enabled, 1);
+}
+
+#[test]
+fn test_wal_mode_enabled() {
+    let dir = tempdir().unwrap();
+    let pool = init_database(dir.path().to_path_buf()).unwrap();
+    let conn = pool.get().unwrap();
+
+    let journal_mode: String = conn
+        .query_row("PRAGMA journal_mode", [], |row| row.get(0))
+        .unwrap();
+
+    assert_eq!(journal_mode.to_lowercase(), "wal");
+}
+
+#[test]
+fn test_cascade_delete_agents_on_worktree_delete() {
+    let dir = tempdir().unwrap();
+    let pool = init_database(dir.path().to_path_buf()).unwrap();
+    let conn = pool.get().unwrap();
+
+    // Create workspace, worktree, and agents
+    conn.execute(
+        "INSERT INTO workspaces (id, name, path) VALUES ('ws1', 'Test', '/tmp/test')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO worktrees (id, workspace_id, name, branch, path) VALUES ('wt1', 'ws1', 'main', 'main', '/tmp/test')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO agents (id, worktree_id, name, status, mode, permissions) VALUES ('ag1', 'wt1', 'Agent', 'finished', 'regular', '[\"read\"]')",
+        [],
+    ).unwrap();
+
+    // Delete worktree
+    conn.execute("DELETE FROM worktrees WHERE id = 'wt1'", []).unwrap();
+
+    // Agent should be cascade deleted
+    let count: i32 = conn
+        .query_row("SELECT COUNT(*) FROM agents WHERE id = 'ag1'", [], |row| row.get(0))
+        .unwrap();
+
+    assert_eq!(count, 0);
+}
+```
+
+### 9.7 End-to-End Tests
+
+**File: `tests/e2e/agent_lifecycle_test.rs`**
+
+```rust
+//! End-to-end tests that test the full application stack
+//! These tests require a real Claude CLI or mock CLI to be available
+
+use std::process::Command;
+use std::time::Duration;
+use tokio::time::sleep;
+
+mod common;
+use common::TestContext;
+
+/// Skip E2E tests if Claude CLI is not available
+fn skip_if_no_cli() -> bool {
+    Command::new("claude")
+        .arg("--version")
+        .output()
+        .is_err()
+}
+
+#[tokio::test]
+#[ignore = "Requires Claude CLI"]
+async fn test_full_agent_lifecycle() {
+    if skip_if_no_cli() {
+        eprintln!("Skipping: Claude CLI not available");
+        return;
+    }
+
+    let ctx = TestContext::new();
+
+    // Create agent
+    let agent = ctx.agent_service.create_agent(
+        &ctx.worktree_id,
+        Some("E2E Test Agent".to_string()),
+        AgentMode::Regular,
+        vec![Permission::Read],
+    ).unwrap();
+
+    // Start agent
+    let started = ctx.agent_service.start_agent(
+        &agent.id,
+        ctx.temp_dir.path().to_str().unwrap(),
+        Some("echo 'Hello from test'"),
+    ).unwrap();
+    assert_eq!(started.status, AgentStatus::Running);
+
+    // Wait for processing
+    sleep(Duration::from_secs(2)).await;
+
+    // Check for output
+    let (messages, _, _) = ctx.agent_service.get_messages(&agent.id, 10, None).unwrap();
+    assert!(!messages.is_empty());
+
+    // Stop agent
+    let stopped = ctx.agent_service.stop_agent(&agent.id, false).unwrap();
+    assert_eq!(stopped.status, AgentStatus::Finished);
+}
+
+#[tokio::test]
+async fn test_concurrent_agents() {
+    let ctx = TestContext::new();
+
+    // Create multiple agents
+    let mut agents = Vec::new();
+    for i in 0..5 {
+        let agent = ctx.agent_service.create_agent(
+            &ctx.worktree_id,
+            Some(format!("Concurrent Agent {}", i)),
+            AgentMode::Regular,
+            vec![Permission::Read],
+        ).unwrap();
+        agents.push(agent);
+    }
+
+    // Start all agents concurrently
+    let handles: Vec<_> = agents.iter().map(|agent| {
+        let agent_id = agent.id.clone();
+        let path = ctx.temp_dir.path().to_str().unwrap().to_string();
+        let service = ctx.agent_service.clone();
+
+        tokio::spawn(async move {
+            service.start_agent(&agent_id, &path, None)
+        })
+    }).collect();
+
+    // Wait for all to start
+    for handle in handles {
+        handle.await.unwrap().unwrap();
+    }
+
+    // Verify all running
+    assert_eq!(ctx.process_manager.get_running_count(), 5);
+
+    // Stop all
+    for agent in &agents {
+        ctx.agent_service.stop_agent(&agent.id, false).unwrap();
+    }
+
+    assert_eq!(ctx.process_manager.get_running_count(), 0);
+}
+
+#[tokio::test]
+async fn test_agent_recovery_after_crash() {
+    let ctx = TestContext::new();
+
+    // Create and start agent
+    let agent = ctx.agent_service.create_agent(
+        &ctx.worktree_id,
+        Some("Recovery Test".to_string()),
+        AgentMode::Regular,
+        vec![Permission::Read],
+    ).unwrap();
+
+    ctx.agent_service.start_agent(
+        &agent.id,
+        ctx.temp_dir.path().to_str().unwrap(),
+        None,
+    ).unwrap();
+
+    // Simulate crash by force stopping
+    ctx.agent_service.stop_agent(&agent.id, true).unwrap();
+
+    // Verify agent is marked as finished
+    let recovered = ctx.agent_service.get_agent(&agent.id).unwrap();
+    assert_eq!(recovered.status, AgentStatus::Finished);
+    assert!(recovered.pid.is_none());
+
+    // Should be able to restart
+    let restarted = ctx.agent_service.start_agent(
+        &agent.id,
+        ctx.temp_dir.path().to_str().unwrap(),
+        None,
+    ).unwrap();
+    assert_eq!(restarted.status, AgentStatus::Running);
+}
+```
+
+### 9.8 Benchmarks
+
+**File: `benches/agent_benchmarks.rs`**
+
+```rust
+use criterion::{black_box, criterion_group, criterion_main, Criterion, BenchmarkId};
+use tempfile::tempdir;
+
+use claude_manager_lib::db::{init_database, AgentRepository};
+use claude_manager_lib::types::{Agent, AgentMode, AgentStatus, Permission};
+
+fn setup_benchmark_db() -> (AgentRepository, tempfile::TempDir) {
+    let dir = tempdir().unwrap();
+    let pool = init_database(dir.path().to_path_buf()).unwrap();
+
+    let conn = pool.get().unwrap();
+    conn.execute(
+        "INSERT INTO workspaces (id, name, path) VALUES ('ws_bench', 'Bench', '/tmp/bench')",
+        [],
+    ).unwrap();
+    conn.execute(
+        "INSERT INTO worktrees (id, workspace_id, name, branch, path) VALUES ('wt_bench', 'ws_bench', 'main', 'main', '/tmp/bench')",
+        [],
+    ).unwrap();
+
+    (AgentRepository::new(pool), dir)
+}
+
+fn create_test_agent() -> Agent {
+    Agent {
+        id: String::new(),
+        worktree_id: "wt_bench".to_string(),
+        name: "Benchmark Agent".to_string(),
+        status: AgentStatus::Finished,
+        context_level: 0,
+        mode: AgentMode::Regular,
+        permissions: vec![Permission::Read],
+        display_order: 0,
+        pid: None,
+        session_id: None,
+        created_at: chrono::Utc::now().to_rfc3339(),
+        updated_at: chrono::Utc::now().to_rfc3339(),
+        started_at: None,
+        stopped_at: None,
+        deleted_at: None,
+        parent_agent_id: None,
+    }
+}
+
+fn benchmark_agent_creation(c: &mut Criterion) {
+    let (repo, _dir) = setup_benchmark_db();
+
+    c.bench_function("create_agent", |b| {
+        b.iter(|| {
+            repo.create(black_box(&create_test_agent())).unwrap()
+        })
+    });
+}
+
+fn benchmark_agent_lookup(c: &mut Criterion) {
+    let (repo, _dir) = setup_benchmark_db();
+
+    // Pre-create agents
+    let mut agent_ids = Vec::new();
+    for _ in 0..100 {
+        let agent = repo.create(&create_test_agent()).unwrap();
+        agent_ids.push(agent.id);
+    }
+
+    c.bench_function("find_agent_by_id", |b| {
+        let mut idx = 0;
+        b.iter(|| {
+            let id = &agent_ids[idx % agent_ids.len()];
+            idx += 1;
+            repo.find_by_id(black_box(id)).unwrap()
+        })
+    });
+}
+
+fn benchmark_list_agents(c: &mut Criterion) {
+    let mut group = c.benchmark_group("list_agents");
+
+    for count in [10, 50, 100, 500].iter() {
+        let (repo, _dir) = setup_benchmark_db();
+
+        // Pre-create agents
+        for _ in 0..*count {
+            repo.create(&create_test_agent()).unwrap();
+        }
+
+        group.bench_with_input(
+            BenchmarkId::from_parameter(count),
+            count,
+            |b, _| {
+                b.iter(|| {
+                    repo.find_by_worktree_id(black_box("wt_bench"), false).unwrap()
+                })
+            },
+        );
+    }
+
+    group.finish();
+}
+
+fn benchmark_agent_reorder(c: &mut Criterion) {
+    let (repo, _dir) = setup_benchmark_db();
+
+    // Pre-create agents
+    let mut agent_ids = Vec::new();
+    for _ in 0..50 {
+        let agent = repo.create(&create_test_agent()).unwrap();
+        agent_ids.push(agent.id);
+    }
+
+    c.bench_function("reorder_50_agents", |b| {
+        b.iter(|| {
+            // Reverse order
+            let reversed: Vec<_> = agent_ids.iter().rev().cloned().collect();
+            repo.reorder(black_box("wt_bench"), black_box(&reversed)).unwrap()
+        })
+    });
+}
+
+criterion_group!(
+    benches,
+    benchmark_agent_creation,
+    benchmark_agent_lookup,
+    benchmark_list_agents,
+    benchmark_agent_reorder,
+);
+
+criterion_main!(benches);
+```
+
+### 9.9 Running Tests
+
+**Commands:**
+
+```bash
+# Run all unit tests
+cargo test --lib
+
+# Run all tests including integration
+cargo test --all
+
+# Run specific test module
+cargo test services::agent_service::tests
+
+# Run with logging output
+RUST_LOG=debug cargo test -- --nocapture
+
+# Run only integration tests
+cargo test --test '*'
+
+# Run benchmarks
+cargo bench
+
+# Generate coverage report (requires cargo-llvm-cov)
+cargo llvm-cov --html
+
+# Run tests in parallel with specific thread count
+cargo test -- --test-threads=4
+
+# Run ignored E2E tests (requires CLI)
+cargo test -- --ignored
+```
+
+### 9.10 CI Test Configuration
+
+**File: `.github/workflows/test.yml`**
+
+```yaml
+name: Tests
+
+on:
+  push:
+    branches: [main, develop]
+  pull_request:
+    branches: [main]
+
+env:
+  CARGO_TERM_COLOR: always
+  RUST_BACKTRACE: 1
+
+jobs:
+  test:
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
+        rust: [stable]
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Cache cargo
+        uses: Swatinem/rust-cache@v2
+        with:
+          workspaces: src-tauri
+
+      - name: Install Linux dependencies
+        if: runner.os == 'Linux'
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Run unit tests
+        working-directory: src-tauri
+        run: cargo test --lib --verbose
+
+      - name: Run integration tests
+        working-directory: src-tauri
+        run: cargo test --test '*' --verbose
+
+  coverage:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+        with:
+          components: llvm-tools-preview
+
+      - name: Install cargo-llvm-cov
+        uses: taiki-e/install-action@cargo-llvm-cov
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Generate coverage report
+        working-directory: src-tauri
+        run: cargo llvm-cov --all-features --lcov --output-path lcov.info
+
+      - name: Upload coverage to Codecov
+        uses: codecov/codecov-action@v3
+        with:
+          files: src-tauri/lcov.info
+          fail_ci_if_error: true
+
+  benchmarks:
+    runs-on: ubuntu-latest
+    if: github.event_name == 'push' && github.ref == 'refs/heads/main'
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Install Rust
+        uses: dtolnay/rust-action@stable
+
+      - name: Install Linux dependencies
+        run: |
+          sudo apt-get update
+          sudo apt-get install -y libwebkit2gtk-4.1-dev build-essential libssl-dev libayatana-appindicator3-dev librsvg2-dev
+
+      - name: Run benchmarks
+        working-directory: src-tauri
+        run: cargo bench -- --output-format bencher | tee benchmark-results.txt
+
+      - name: Store benchmark results
+        uses: benchmark-action/github-action-benchmark@v1
+        with:
+          tool: 'cargo'
+          output-file-path: src-tauri/benchmark-results.txt
+          github-token: ${{ secrets.GITHUB_TOKEN }}
+          auto-push: true
+```
+
+### 9.11 Test Migration Checklist
+
+Port the existing 175+ Node.js tests to Rust:
+
+| Node.js Test Category        | Rust Equivalent                                     | Status |
+| ---------------------------- | --------------------------------------------------- | ------ |
+| **Repository Tests**         |                                                     |        |
+| agent.repository.test.ts     | `src/db/repositories/agent_repository.rs#tests`     | ⬜     |
+| message.repository.test.ts   | `src/db/repositories/message_repository.rs#tests`   | ⬜     |
+| worktree.repository.test.ts  | `src/db/repositories/worktree_repository.rs#tests`  | ⬜     |
+| workspace.repository.test.ts | `src/db/repositories/workspace_repository.rs#tests` | ⬜     |
+| **Service Tests**            |                                                     |        |
+| agent.service.test.ts        | `src/services/agent_service.rs#tests`               | ⬜     |
+| git.service.test.ts          | `src/services/git_service.rs#tests`                 | ⬜     |
+| process.service.test.ts      | `src/services/process_service.rs#tests`             | ⬜     |
+| workspace.service.test.ts    | `src/services/workspace_service.rs#tests`           | ⬜     |
+| **API Integration Tests**    |                                                     |        |
+| agents.test.ts               | `tests/api/agent_commands_test.rs`                  | ⬜     |
+| worktrees.test.ts            | `tests/api/worktree_commands_test.rs`               | ⬜     |
+| workspaces.test.ts           | `tests/api/workspace_commands_test.rs`              | ⬜     |
+| **WebSocket Tests**          |                                                     |        |
+| agent-streaming.test.ts      | `tests/websocket/streaming_test.rs`                 | ⬜     |
+| **Database Tests**           |                                                     |        |
+| migrations.test.ts           | `tests/database/migrations_test.rs`                 | ⬜     |
+| **E2E Tests**                |                                                     |        |
+| agent-lifecycle.spec.ts      | `tests/e2e/agent_lifecycle_test.rs`                 | ⬜     |
+| workspace.spec.ts            | `tests/e2e/workspace_test.rs`                       | ⬜     |
+| worktree-management.spec.ts  | `tests/e2e/worktree_test.rs`                        | ⬜     |
+
+**Acceptance Criteria:**
+
+- [ ] All unit tests pass on Linux, macOS, and Windows
+- [ ] Integration tests pass with mock process manager
+- [ ] Coverage meets minimum thresholds (80% unit, 70% integration)
+- [ ] Critical paths have 95%+ coverage
+- [ ] Benchmarks establish performance baseline
+- [ ] E2E tests pass with mock CLI
+- [ ] CI pipeline passes on all platforms
+
+---
+
 ## Summary: Migration Timeline
 
-| Phase | Description | Duration | Dependencies |
-|-------|-------------|----------|--------------|
-| 1 | Project Setup & Foundation | 1-2 days | None |
-| 2 | Core Types & Database Layer | 2-3 days | Phase 1 |
-| 3 | Service Layer | 4-5 days | Phase 2 |
-| 4 | WebSocket Server | 2-3 days | Phase 3 |
-| 5 | Tauri Commands (IPC) | 2-3 days | Phase 3, 4 |
-| 6 | Frontend Integration | 2-3 days | Phase 5 |
-| 7 | Build & Distribution | 1-2 days | Phase 6 |
-| 8 | Migration & Testing | 2-3 days | Phase 7 |
+| Phase | Description                 | Duration | Dependencies        |
+| ----- | --------------------------- | -------- | ------------------- |
+| 1     | Project Setup & Foundation  | 1-2 days | None                |
+| 2     | Core Types & Database Layer | 2-3 days | Phase 1             |
+| 3     | Service Layer               | 4-5 days | Phase 2             |
+| 4     | WebSocket Server            | 2-3 days | Phase 3             |
+| 5     | Tauri Commands (IPC)        | 2-3 days | Phase 3, 4          |
+| 6     | Frontend Integration        | 2-3 days | Phase 5             |
+| 7     | Build & Distribution        | 1-2 days | Phase 6             |
+| 8     | Data Migration              | 1-2 days | Phase 7             |
+| 9     | Comprehensive Testing       | 4-6 days | Phase 3+ (parallel) |
 
-**Total Estimated Duration: 16-24 days**
+**Total Estimated Duration: 18-28 days**
+
+**Note:** Phase 9 (Testing) can run in parallel with Phases 4-7. Unit tests should be written alongside each component (TDD approach recommended). Integration and E2E tests are written after the components are functional.
 
 ---
 

@@ -12,7 +12,7 @@ Claude Manager provides a visual interface to:
 - Configure agent modes (auto-approve/plan/regular) and permissions
 - View API usage statistics
 
-**Current State**: Migrating from Node.js backend to Rust + Tauri native desktop application. The Node.js implementation is complete with 175+ tests. Rust migration is in progress.
+**Current State**: Rust + Tauri backend Phase 1 complete. The project scaffold compiles successfully with all core modules in place. The Node.js implementation remains available as reference (175+ tests).
 
 ## 🚀 Migration Status: Node.js → Rust + Tauri
 
@@ -28,32 +28,43 @@ This project is transitioning from a Node.js/Fastify backend to a native Rust ba
 
 ### Migration Phases
 
-| Phase | Description | Status |
-|-------|-------------|--------|
-| 1 | Project Setup & Tauri Init | ⬜ Not Started |
-| 2 | Core Types & Database Layer | ⬜ Not Started |
-| 3 | Service Layer | ⬜ Not Started |
-| 4 | WebSocket Server | ⬜ Not Started |
-| 5 | Tauri Commands (IPC) | ⬜ Not Started |
-| 6 | Frontend Integration | ⬜ Not Started |
-| 7 | Build & Distribution | ⬜ Not Started |
-| 8 | Data Migration | ⬜ Not Started |
-| 9 | Comprehensive Testing | ⬜ Not Started |
+| Phase | Description                 | Status                   |
+| ----- | --------------------------- | ------------------------ |
+| 1     | Project Setup & Tauri Init  | ✅ Complete              |
+| 2     | Core Types & Database Layer | ✅ Complete (in Phase 1) |
+| 3     | Service Layer               | ✅ Complete (in Phase 1) |
+| 4     | WebSocket Server            | ✅ Complete (in Phase 1) |
+| 5     | Tauri Commands (IPC)        | ✅ Complete (in Phase 1) |
+| 6     | Frontend Integration        | ⬜ Not Started           |
+| 7     | Build & Distribution        | ⬜ Not Started           |
+| 8     | Data Migration              | ⬜ Not Started           |
+| 9     | Comprehensive Testing       | ⬜ Not Started           |
+
+### Phase 1 Deliverables (Complete)
+
+- **35 source files** created in `src-tauri/`
+- Full project scaffold: types, commands, services, db, websocket
+- SQLite database with migrations and repository pattern
+- Tauri IPC commands for all API endpoints
+- WebSocket server using Axum
+- Git operations using git2-rs
+- Process manager for Claude CLI agents
+- Compiles successfully with `cargo check`
 
 ## Documentation
 
-| Document | Description |
-|----------|-------------|
-| [docs/README.md](docs/README.md) | Documentation index and quick start |
-| [docs/09-rust-tauri-migration.md](docs/09-rust-tauri-migration.md) | **Rust + Tauri migration plan** |
-| [docs/01-architecture-overview.md](docs/01-architecture-overview.md) | System architecture, tech stack |
-| [docs/02-api-specification.md](docs/02-api-specification.md) | REST API & WebSocket specification |
-| [docs/03-database-schema.md](docs/03-database-schema.md) | SQLite schema and migrations |
-| [docs/04-backend-implementation.md](docs/04-backend-implementation.md) | Node.js service layer (legacy) |
-| [docs/05-testing-strategy.md](docs/05-testing-strategy.md) | Node.js testing (legacy) |
-| [docs/06-ci-cd-pipeline.md](docs/06-ci-cd-pipeline.md) | GitHub Actions and Docker setup |
-| [docs/07-implementation-phases.md](docs/07-implementation-phases.md) | Node.js phased delivery (legacy) |
-| [docs/08-frontend-integration.md](docs/08-frontend-integration.md) | React Query and WebSocket integration |
+| Document                                                               | Description                           |
+| ---------------------------------------------------------------------- | ------------------------------------- |
+| [docs/README.md](docs/README.md)                                       | Documentation index and quick start   |
+| [docs/09-rust-tauri-migration.md](docs/09-rust-tauri-migration.md)     | **Rust + Tauri migration plan**       |
+| [docs/01-architecture-overview.md](docs/01-architecture-overview.md)   | System architecture, tech stack       |
+| [docs/02-api-specification.md](docs/02-api-specification.md)           | REST API & WebSocket specification    |
+| [docs/03-database-schema.md](docs/03-database-schema.md)               | SQLite schema and migrations          |
+| [docs/04-backend-implementation.md](docs/04-backend-implementation.md) | Node.js service layer (legacy)        |
+| [docs/05-testing-strategy.md](docs/05-testing-strategy.md)             | Node.js testing (legacy)              |
+| [docs/06-ci-cd-pipeline.md](docs/06-ci-cd-pipeline.md)                 | GitHub Actions and Docker setup       |
+| [docs/07-implementation-phases.md](docs/07-implementation-phases.md)   | Node.js phased delivery (legacy)      |
+| [docs/08-frontend-integration.md](docs/08-frontend-integration.md)     | React Query and WebSocket integration |
 
 ## Tech Stack
 
@@ -290,14 +301,15 @@ interface Agent {
 
 ### Rust Tests (Target)
 
-| Category | Coverage Target | Location |
-|----------|-----------------|----------|
-| Unit Tests | 80-90% | `src/**/*.rs` (`#[cfg(test)]` modules) |
-| Integration Tests | 70-80% | `tests/` directory |
-| E2E Tests | Critical paths | `tests/e2e/` |
-| Benchmarks | Performance baseline | `benches/` |
+| Category          | Coverage Target      | Location                               |
+| ----------------- | -------------------- | -------------------------------------- |
+| Unit Tests        | 80-90%               | `src/**/*.rs` (`#[cfg(test)]` modules) |
+| Integration Tests | 70-80%               | `tests/` directory                     |
+| E2E Tests         | Critical paths       | `tests/e2e/`                           |
+| Benchmarks        | Performance baseline | `benches/`                             |
 
 **Critical paths requiring 95%+ coverage:**
+
 - Agent spawning and lifecycle
 - Message send/receive flow
 - Git worktree operations
@@ -320,18 +332,18 @@ interface Agent {
 
 ## Implementation Status
 
-| Component | Node.js | Rust | Notes |
-|-----------|---------|------|-------|
-| Frontend UI | ✅ | ✅ | Shared |
-| API Client | ✅ | ⬜ | Adding Tauri IPC |
-| Database Layer | ✅ | ⬜ | Same SQLite schema |
-| Agent Service | ✅ | ⬜ | Port in progress |
-| Process Manager | ✅ | ⬜ | tokio::process |
-| Git Service | ✅ | ⬜ | git2-rs |
-| WebSocket | ✅ | ⬜ | Axum WebSocket |
-| Tauri Commands | N/A | ⬜ | New IPC layer |
-| Testing | ✅ 175+ | ⬜ | Port tests |
-| CI/CD | ✅ | ⬜ | Multi-platform |
+| Component       | Node.js | Rust | Notes                |
+| --------------- | ------- | ---- | -------------------- |
+| Frontend UI     | ✅      | ✅   | Shared               |
+| API Client      | ✅      | ✅   | Tauri IPC ready      |
+| Database Layer  | ✅      | ✅   | rusqlite + r2d2      |
+| Agent Service   | ✅      | ✅   | Scaffold complete    |
+| Process Manager | ✅      | ✅   | tokio + portable-pty |
+| Git Service     | ✅      | ✅   | git2-rs              |
+| WebSocket       | ✅      | ✅   | Axum WebSocket       |
+| Tauri Commands  | N/A     | ✅   | All endpoints        |
+| Testing         | ✅ 175+ | ⬜   | Port tests           |
+| CI/CD           | ✅      | ⬜   | Multi-platform       |
 
 ## Getting Started with Migration
 

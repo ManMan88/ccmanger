@@ -33,3 +33,7 @@ dist-ssr
 # Database
 *.db
 *.db-journal
+
+# Rust/Tauri
+/src-tauri/target/
+/src-tauri/Cargo.lock
