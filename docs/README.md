@@ -2,55 +2,28 @@
 
 ## Overview
 
-This documentation provides a comprehensive plan for implementing the Claude Manager backend and integrating it with the existing React frontend. Claude Manager is a GUI application for managing Claude Code CLI agents across git worktrees.
-
-> **Migration Complete**: The Rust + Tauri migration is complete with 68 tests passing. The project now supports native desktop builds with multi-platform CI/CD. See [09-rust-tauri-migration.md](./09-rust-tauri-migration.md) for the migration plan.
+Claude Manager is a native desktop application for managing Claude Code CLI agents across git worktrees. Built with Rust and Tauri, it provides a React frontend with a high-performance Rust backend.
 
 ## Document Index
 
-| Document                                                       | Description                                                           |
-| -------------------------------------------------------------- | --------------------------------------------------------------------- |
-| [09-rust-tauri-migration.md](./09-rust-tauri-migration.md)     | **Rust + Tauri migration plan (START HERE)**                          |
-| [01-architecture-overview.md](./01-architecture-overview.md)   | System architecture, tech stack, directory structure, design patterns |
-| [02-api-specification.md](./02-api-specification.md)           | REST API endpoints, WebSocket events, request/response schemas        |
-| [03-database-schema.md](./03-database-schema.md)               | SQLite schema, migrations, entity relationships, TypeScript types     |
-| [04-backend-implementation.md](./04-backend-implementation.md) | Node.js service layer (legacy)                                        |
-| [05-testing-strategy.md](./05-testing-strategy.md)             | Testing strategy (Node.js legacy + Rust)                              |
-| [06-ci-cd-pipeline.md](./06-ci-cd-pipeline.md)                 | GitHub Actions workflows, multi-platform builds                       |
-| [07-implementation-phases.md](./07-implementation-phases.md)   | Node.js phased delivery (legacy)                                      |
-| [08-frontend-integration.md](./08-frontend-integration.md)     | API client, React Query, Tauri IPC integration                        |
+| Document                                                     | Description                                                           |
+| ------------------------------------------------------------ | --------------------------------------------------------------------- |
+| [01-architecture-overview.md](./01-architecture-overview.md) | System architecture, tech stack, directory structure, design patterns |
+| [02-api-specification.md](./02-api-specification.md)         | Tauri IPC commands, WebSocket events, request/response schemas        |
+| [03-database-schema.md](./03-database-schema.md)             | SQLite schema, migrations, entity relationships                       |
+| [08-frontend-integration.md](./08-frontend-integration.md)   | React Query setup, Tauri IPC integration, component patterns          |
 
-## Quick Start
-
-### Current State (Rust Migration Complete)
-
-- **Frontend**: React 18 + TypeScript + Vite + React Query + Tauri IPC
-- **Backend (Rust)**: Tauri 2.x + rusqlite + Axum WebSocket (68 tests passing)
-- **Backend (Node.js)**: Fastify + SQLite + WebSocket (175+ tests, legacy)
-- **CI/CD**: Multi-platform builds (macOS, Linux, Windows)
-- **Testing**: Unit tests, integration tests, benchmarks, E2E with Playwright
-
-### Migration Phases (All Complete)
-
-| Phase | Description                | Status                 |
-| ----- | -------------------------- | ---------------------- |
-| 1     | Project Setup & Tauri Init | ✅ Complete            |
-| 2-5   | Core Types, Services, IPC  | ✅ Complete            |
-| 6     | Frontend Integration       | ✅ Complete            |
-| 7     | Build & Distribution       | ✅ Complete            |
-| 8     | Migration & Testing        | ✅ Complete            |
-| 9     | Comprehensive Testing      | ✅ Complete (68 tests) |
-
-## Technology Stack Summary
+## Technology Stack
 
 ### Frontend
 
 - React 18.3 + TypeScript 5.8
 - Vite 5.4 (build tool)
 - Tailwind CSS 3.4 + shadcn/ui
-- React Query + Tauri IPC
+- React Query (TanStack Query)
+- WebSocket client with auto-reconnect
 
-### Backend - Rust/Tauri (Target)
+### Backend (Rust/Tauri)
 
 - Tauri 2.x + Tokio async runtime
 - Axum (WebSocket server)
@@ -58,38 +31,12 @@ This documentation provides a comprehensive plan for implementing the Claude Man
 - git2-rs (Git operations)
 - tokio::process (process management)
 
-### Backend - Node.js (Legacy)
+### Testing
 
-- Node.js 20 LTS + TypeScript
-- Fastify 4.x (HTTP server)
-- @fastify/websocket (real-time)
-- better-sqlite3 (database)
-- simple-git (git operations)
-
-### DevOps
-
-- GitHub Actions (multi-platform CI/CD)
-- Tauri native builds (DMG, DEB, AppImage, MSI)
+- 68 Rust tests (30 unit + 38 integration)
 - Criterion benchmarks
-- Vitest + cargo test
-
-> **Note:** Native deployment - Claude Manager requires direct access to local git repositories, the Claude CLI, and file system.
-
-## Rust Migration Deliverables
-
-### Phase 7 (Build & Distribution)
-
-- Multi-platform GitHub Actions workflows
-- Native installers for macOS (DMG), Linux (DEB, AppImage), Windows (MSI)
-- Rust linting (clippy) and testing in CI
-- Benchmark infrastructure with Criterion
-
-### Phase 8 (Migration & Testing)
-
-- Data migration utility (`migration_tool.rs`) for Node.js → Rust
-- 68 tests (30 unit + 38 integration)
-- Test infrastructure: TestContext, fixtures, mocks
-- Database backup and integrity verification
+- Vitest for frontend
+- Playwright for E2E
 
 ## Key Features
 
@@ -114,40 +61,40 @@ This documentation provides a comprehensive plan for implementing the Claude Man
 - Multiple worktrees per workspace
 - Usage statistics tracking
 
-## Architecture Diagram
+## Architecture
 
 ```
-┌─────────────────────────────────────────────────────────────────┐
-│                         Frontend                                 │
-│  React + TypeScript + Tailwind + shadcn/ui + React Query        │
-└─────────────────────────────────────────────────────────────────┘
-                    │ REST API          │ WebSocket
-                    ▼                   ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                         Backend                                  │
-│  Fastify + TypeScript + @fastify/websocket                      │
-├─────────────────────────────────────────────────────────────────┤
-│  Services: Workspace | Worktree | Agent | Git | Process | Usage │
-└─────────────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                      Data Layer                                  │
-│  SQLite (better-sqlite3) + File System (git repos, logs)        │
-└─────────────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   External Systems                               │
-│  Claude Code CLI | Git CLI | Anthropic API (optional)           │
-└─────────────────────────────────────────────────────────────────┘
+┌───────────────────────────────────────────────────────────────┐
+│                     Tauri Application                          │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │              WebView (Frontend)                          │  │
+│  │         React + TypeScript + Tailwind                   │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                          │                                     │
+│                    Tauri Commands (IPC)                        │
+│                          │                                     │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │               Rust Backend Core                          │  │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │  │
+│  │  │   Services  │ │   SQLite    │ │  WebSocket  │       │  │
+│  │  │   (Axum)    │ │  (rusqlite) │ │  (tokio-ws) │       │  │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘       │  │
+│  │                        │                                 │  │
+│  │  ┌─────────────────────────────────────────────────┐   │  │
+│  │  │     Process Manager (tokio::process)             │   │  │
+│  │  └─────────────────────────────────────────────────┘   │  │
+│  └─────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ Claude Code CLI │
+                       └─────────────────┘
 ```
 
-## Getting Started with Development
+## Getting Started
 
 ### Prerequisites
-
-**For Tauri (Recommended):**
 
 - Rust 1.75+ (`curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`)
 - pnpm 9+
@@ -155,14 +102,7 @@ This documentation provides a comprehensive plan for implementing the Claude Man
 - Platform dependencies (see [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites))
 - Claude Code CLI (for agent features)
 
-**For Node.js (Legacy):**
-
-- Node.js 20+
-- pnpm 9+
-- Git
-- Claude Code CLI (for agent features)
-
-### Setup
+### Development
 
 ```bash
 # Clone repository
@@ -172,12 +112,8 @@ cd claude-manager
 # Install dependencies
 pnpm install
 
-# Start Tauri development mode (recommended)
+# Start development mode
 pnpm tauri dev
-
-# OR start Node.js servers (legacy)
-pnpm dev        # Frontend on :8080
-pnpm dev:server # Backend on :3001
 ```
 
 ### Running Tests
@@ -185,25 +121,31 @@ pnpm dev:server # Backend on :3001
 ```bash
 # Rust tests
 cd src-tauri
-cargo test              # All Rust tests (68 tests)
+cargo test              # All tests (68 tests)
 cargo bench             # Performance benchmarks
 
 # Frontend tests
-pnpm test               # Frontend tests (Vitest)
-pnpm test:e2e           # E2E tests (Playwright)
+pnpm test               # Vitest
+pnpm test:e2e           # Playwright
+```
 
-# Node.js backend tests (legacy)
-pnpm --filter @claude-manager/server test
+### Building
+
+```bash
+# Build native application
+pnpm tauri build
+
+# Output: src-tauri/target/release/bundle/
 ```
 
 ## Contributing
 
 1. Read the relevant documentation for the area you're working on
-2. Follow the implementation phases in order
-3. Write tests alongside code (TDD encouraged)
+2. Write tests alongside code (TDD encouraged)
+3. Use `cargo clippy` for linting and `cargo fmt` for formatting
 4. Ensure CI passes before merging
 5. Update documentation as needed
 
 ## License
 
-[Add license information]
+MIT
