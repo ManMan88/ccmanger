@@ -315,6 +315,7 @@ main() {
             if [ -f "shared-package.json" ]; then
                 mkdir -p shared
                 mv shared-package.json shared/package.json
+                rm -rf shared/dist
                 mv shared-dist shared/dist
             fi
 
@@ -322,6 +323,7 @@ main() {
             if [ -f "server-package.json" ]; then
                 mkdir -p server
                 mv server-package.json server/package.json
+                rm -rf server/dist
                 mv server-dist server/dist
             fi
 
