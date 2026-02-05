@@ -3,7 +3,6 @@ import type {
   CreateUsageStatsDto,
 } from '../db/repositories/usage-stats.repository.js'
 import type { UsageStatsRow, UsagePeriod } from '@claude-manager/shared'
-import { usageStatsRowToApi } from '@claude-manager/shared'
 import { logger } from '../utils/logger.js'
 import { getEventBroadcaster } from '../websocket/index.js'
 
