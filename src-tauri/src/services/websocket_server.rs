@@ -213,7 +213,7 @@ async fn handle_socket(socket: WebSocket, state: Arc<WsState>) {
     // Task to send messages to the WebSocket
     let send_task = tokio::spawn(async move {
         while let Some(msg) = rx.recv().await {
-            if sender.send(Message::Text(msg.into())).await.is_err() {
+            if sender.send(Message::Text(msg)).await.is_err() {
                 break;
             }
         }

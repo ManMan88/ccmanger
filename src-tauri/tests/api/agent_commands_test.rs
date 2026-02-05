@@ -273,10 +273,10 @@ fn test_agent_modes() {
             .create_agent(
                 &ctx.worktree_id,
                 Some(format!("{:?} Agent", mode)),
-                mode.clone(),
+                mode,
                 vec![],
             )
-            .expect(&format!("Should create {:?} agent", mode));
+            .unwrap_or_else(|_| panic!("Should create {:?} agent", mode));
 
         assert_eq!(agent.mode, mode);
     }

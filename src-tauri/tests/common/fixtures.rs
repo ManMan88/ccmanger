@@ -2,6 +2,8 @@
 //!
 //! This module provides factory functions for creating test data.
 
+#![allow(dead_code)]
+
 use claude_manager_lib::types::{
     Agent, AgentMode, AgentStatus, Message, MessageRole, Permission, Workspace, Worktree,
     SortMode,

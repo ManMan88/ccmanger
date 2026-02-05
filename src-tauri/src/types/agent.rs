@@ -23,7 +23,7 @@ impl AgentStatus {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "running" => AgentStatus::Running,
             "waiting" => AgentStatus::Waiting,
@@ -52,7 +52,7 @@ impl AgentMode {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "auto" => AgentMode::Auto,
             "plan" => AgentMode::Plan,
@@ -135,9 +135,9 @@ impl From<AgentRow> for Agent {
             id: row.id,
             worktree_id: row.worktree_id,
             name: row.name,
-            status: AgentStatus::from_str(&row.status),
+            status: AgentStatus::parse(&row.status),
             context_level: row.context_level,
-            mode: AgentMode::from_str(&row.mode),
+            mode: AgentMode::parse(&row.mode),
             permissions: serde_json::from_str(&row.permissions).unwrap_or_else(|_| vec![Permission::Read]),
             display_order: row.display_order,
             pid: row.pid,

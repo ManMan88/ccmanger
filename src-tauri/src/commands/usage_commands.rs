@@ -24,7 +24,7 @@ pub async fn get_usage_history(
     state: State<'_, AppState>,
 ) -> Result<UsageHistoryResponse, String> {
     let period = period
-        .map(|p| UsagePeriod::from_str(&p))
+        .map(|p| UsagePeriod::parse(&p))
         .unwrap_or(UsagePeriod::Daily);
 
     state

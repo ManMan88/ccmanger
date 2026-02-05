@@ -3,6 +3,8 @@
 //! This module provides mock implementations of services and traits
 //! for use in unit and integration tests.
 
+#![allow(dead_code)]
+
 use std::collections::HashMap;
 use std::sync::{Arc, Mutex};
 

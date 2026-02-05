@@ -105,7 +105,7 @@ fn test_all_tables_created() {
                 [table],
                 |row| row.get(0),
             )
-            .expect(&format!("Failed to check if table {} exists", table));
+            .unwrap_or_else(|_| panic!("Failed to check if table {} exists", table));
         assert!(exists, "Table '{}' should exist", table);
     }
 }

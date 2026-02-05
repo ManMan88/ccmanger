@@ -2,6 +2,8 @@
 //!
 //! This module provides shared test infrastructure for integration tests.
 
+#![allow(dead_code)]
+
 pub mod fixtures;
 pub mod mocks;
 

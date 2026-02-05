@@ -22,7 +22,7 @@ impl MessageRole {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "user" => MessageRole::User,
             "assistant" => MessageRole::Assistant,
@@ -73,7 +73,7 @@ impl From<MessageRow> for Message {
         Message {
             id: row.id,
             agent_id: row.agent_id,
-            role: MessageRole::from_str(&row.role),
+            role: MessageRole::parse(&row.role),
             content: row.content,
             token_count: row.token_count,
             tool_name: row.tool_name,

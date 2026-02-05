@@ -21,7 +21,7 @@ impl SortMode {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "status" => SortMode::Status,
             "name" => SortMode::Name,
@@ -69,7 +69,7 @@ impl From<WorktreeRow> for Worktree {
             name: row.name,
             branch: row.branch,
             path: row.path,
-            sort_mode: SortMode::from_str(&row.sort_mode),
+            sort_mode: SortMode::parse(&row.sort_mode),
             display_order: row.display_order,
             is_main: row.is_main,
             created_at: row.created_at,

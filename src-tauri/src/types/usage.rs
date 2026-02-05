@@ -20,7 +20,7 @@ impl UsagePeriod {
         }
     }
 
-    pub fn from_str(s: &str) -> Self {
+    pub fn parse(s: &str) -> Self {
         match s.to_lowercase().as_str() {
             "weekly" => UsagePeriod::Weekly,
             "monthly" => UsagePeriod::Monthly,
@@ -68,7 +68,7 @@ impl From<UsageStatsRow> for UsageStats {
         UsageStats {
             id: row.id,
             date: row.date,
-            period: UsagePeriod::from_str(&row.period),
+            period: UsagePeriod::parse(&row.period),
             input_tokens: row.input_tokens,
             output_tokens: row.output_tokens,
             total_tokens: row.total_tokens,
