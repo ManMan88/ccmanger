@@ -73,6 +73,9 @@ jobs:
       - name: Install dependencies
         run: pnpm install --frozen-lockfile
 
+      - name: Build shared package
+        run: pnpm --filter @claude-manager/shared build
+
       - name: Lint
         run: |
           pnpm lint
