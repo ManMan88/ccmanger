@@ -2,12 +2,15 @@
 
 [![CI](https://github.com/ManMan88/ccmanger/actions/workflows/ci.yml/badge.svg)](https://github.com/ManMan88/ccmanger/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.75+-B7410E?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Tauri](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=black)](https://tauri.app/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)](https://react.dev/)
 [![Playwright](https://img.shields.io/badge/Playwright-E2E%20Tests-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
 
 A desktop application for managing Claude Code CLI agents across git worktrees.
+
+> **Migration in Progress**: This project is transitioning from Node.js/Fastify to a native Rust + Tauri backend. The Rust migration is complete with 68 tests passing. See [CLAUDE.md](CLAUDE.md) for migration details.
 
 ## Installation
 
@@ -27,6 +30,16 @@ This will:
 Open http://localhost:8080 in your browser.
 
 ### Prerequisites
+
+**For Tauri (Native App - Recommended):**
+
+- **Rust 1.75+** - [Install](https://rustup.rs/)
+- **pnpm** - `npm install -g pnpm`
+- **Git** - [Download](https://git-scm.com/)
+- **Claude Code CLI** - Installed and authenticated
+- **Platform dependencies** - See [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
+
+**For Node.js (Legacy):**
 
 - **Node.js 20+** - [Download](https://nodejs.org/) or use [nvm](https://github.com/nvm-sh/nvm)
 - **pnpm** - `npm install -g pnpm`
@@ -53,6 +66,20 @@ pnpm install
 ```
 
 ### Development Setup
+
+**Tauri (Native App):**
+
+```bash
+# Clone and install
+git clone https://github.com/ManMan88/ccmanger.git
+cd ccmanger
+pnpm install
+
+# Start Tauri development mode (hot reload)
+pnpm tauri dev
+```
+
+**Node.js (Legacy):**
 
 ```bash
 # Clone and install
@@ -144,7 +171,19 @@ Interactive API documentation is available at:
 | Real-time  | WebSocket with auto-reconnect |
 | Forms      | React Hook Form + Zod         |
 
-### Backend
+### Backend - Rust/Tauri (Target)
+
+| Category           | Technology                    |
+| ------------------ | ----------------------------- |
+| Runtime            | Tauri 2.x + Tokio             |
+| Framework          | Axum (WebSocket server)       |
+| Database           | rusqlite + r2d2 pool          |
+| Git                | git2-rs                       |
+| Process Management | tokio::process                |
+| Serialization      | serde + serde_json            |
+| Tests              | 68 tests (unit + integration) |
+
+### Backend - Node.js (Legacy)
 
 | Category   | Technology              |
 | ---------- | ----------------------- |
@@ -158,6 +197,18 @@ Interactive API documentation is available at:
 ---
 
 ## Available Scripts
+
+### Tauri/Rust Commands
+
+| Command                        | Description                     |
+| ------------------------------ | ------------------------------- |
+| `pnpm tauri dev`               | Start Tauri in development mode |
+| `pnpm tauri build`             | Build native application        |
+| `cd src-tauri && cargo test`   | Run Rust tests (68 tests)       |
+| `cd src-tauri && cargo bench`  | Run performance benchmarks      |
+| `cd src-tauri && cargo clippy` | Run Rust linter                 |
+
+### Node.js Commands (Legacy)
 
 | Command                                     | Description                                  |
 | ------------------------------------------- | -------------------------------------------- |
@@ -177,7 +228,7 @@ Interactive API documentation is available at:
 
 ```
 claude-manager/
-├── src/                    # Frontend source
+├── src/                    # Frontend source (React)
 │   ├── pages/              # Page components
 │   ├── components/         # React components
 │   │   ├── ui/             # shadcn/ui components
@@ -186,7 +237,16 @@ claude-manager/
 │   ├── lib/                # Utilities and API client
 │   └── types/              # TypeScript types
 │
-├── server/                 # Backend source
+├── src-tauri/              # Rust backend (Tauri) - 68 tests
+│   ├── src/
+│   │   ├── commands/       # Tauri IPC commands
+│   │   ├── services/       # Business logic
+│   │   ├── db/             # Database and repositories
+│   │   └── websocket/      # WebSocket server (Axum)
+│   ├── tests/              # Integration tests
+│   └── benches/            # Performance benchmarks
+│
+├── server/                 # Node.js backend (Legacy)
 │   ├── src/
 │   │   ├── routes/         # REST API endpoints
 │   │   ├── services/       # Business logic

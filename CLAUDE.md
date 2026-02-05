@@ -12,7 +12,7 @@ Claude Manager provides a visual interface to:
 - Configure agent modes (auto-approve/plan/regular) and permissions
 - View API usage statistics
 
-**Current State**: Rust + Tauri backend Phase 6 (Frontend Integration) complete. The frontend API client now supports both Tauri IPC and HTTP fallback. 25 unit tests pass for repository and service layers. The Node.js implementation remains available as reference (175+ tests).
+**Current State**: Rust + Tauri backend Phase 8 (Migration & Testing) complete. The project now has 68 Rust tests (30 unit + 38 integration), a data migration utility, multi-platform CI/CD workflows, and performance benchmarks. Release builds compile successfully. The Node.js implementation remains available as reference (175+ tests).
 
 ## 🚀 Migration Status: Node.js → Rust + Tauri
 
@@ -28,17 +28,17 @@ This project is transitioning from a Node.js/Fastify backend to a native Rust ba
 
 ### Migration Phases
 
-| Phase | Description                 | Status                    |
-| ----- | --------------------------- | ------------------------- |
-| 1     | Project Setup & Tauri Init  | ✅ Complete               |
-| 2     | Core Types & Database Layer | ✅ Complete (in Phase 1)  |
-| 3     | Service Layer               | ✅ Complete (in Phase 1)  |
-| 4     | WebSocket Server            | ✅ Complete (in Phase 1)  |
-| 5     | Tauri Commands (IPC)        | ✅ Complete (in Phase 1)  |
-| 6     | Frontend Integration        | ✅ Complete               |
-| 7     | Build & Distribution        | ⬜ Not Started            |
-| 8     | Data Migration              | ⬜ Not Started            |
-| 9     | Comprehensive Testing       | 🟡 In Progress (25 tests) |
+| Phase | Description                 | Status                   |
+| ----- | --------------------------- | ------------------------ |
+| 1     | Project Setup & Tauri Init  | ✅ Complete              |
+| 2     | Core Types & Database Layer | ✅ Complete (in Phase 1) |
+| 3     | Service Layer               | ✅ Complete (in Phase 1) |
+| 4     | WebSocket Server            | ✅ Complete (in Phase 1) |
+| 5     | Tauri Commands (IPC)        | ✅ Complete (in Phase 1) |
+| 6     | Frontend Integration        | ✅ Complete              |
+| 7     | Build & Distribution        | ✅ Complete              |
+| 8     | Migration & Testing         | ✅ Complete              |
+| 9     | Comprehensive Testing       | ✅ Complete (68 tests)   |
 
 ### Phase 1 Deliverables (Complete)
 
@@ -56,8 +56,32 @@ This project is transitioning from a Node.js/Fastify backend to a native Rust ba
 - **Frontend API client** updated to support Tauri IPC commands with HTTP fallback
 - **WebSocket client** compatible with both Node.js and Rust backends
 - **@tauri-apps/api** dependency added for frontend-backend IPC
-- **25 unit tests** for repository and service layers
 - Full release build compiles successfully
+
+### Phase 7 Deliverables (Complete)
+
+- **Multi-platform CI/CD** with GitHub Actions for macOS, Linux, and Windows
+- **Release workflow** creates native installers (DMG, DEB, AppImage, MSI)
+- **Rust testing in CI** with clippy linting and cargo test
+- **Benchmark infrastructure** with Criterion for performance testing
+
+### Phase 8 Deliverables (Complete)
+
+- **Data migration utility** (`migration_tool.rs`) for Node.js → Rust migration
+  - Database backup with timestamps
+  - Full data import with integrity verification
+  - Orphan detection and FK validation
+- **68 tests passing** (30 unit + 38 integration):
+  - Database migration tests (schema, FK constraints, cascades)
+  - Workspace API tests (6 tests)
+  - Worktree API tests (8 tests)
+  - Agent API tests (14 tests)
+  - Mock process manager tests (4 tests)
+- **Test infrastructure**:
+  - `TestContext` with pool, process manager, temp directories
+  - Test fixtures and `AgentBuilder` pattern
+  - `MockProcessManager` for testing without real processes
+- **Performance benchmarks** for agent operations
 
 ## Documentation
 
@@ -133,7 +157,7 @@ claude-manager/
 │   └── types/
 │       └── agent.ts               # Frontend type definitions
 │
-├── src-tauri/                     # Rust backend (Tauri) - IN PROGRESS
+├── src-tauri/                     # Rust backend (Tauri) - COMPLETE
 │   ├── Cargo.toml                 # Rust dependencies
 │   ├── src/
 │   │   ├── main.rs                # Tauri application entry
@@ -149,11 +173,15 @@ claude-manager/
 │   │   ├── db/                    # Database layer
 │   │   │   ├── connection.rs
 │   │   │   ├── migrations.rs
+│   │   │   ├── migration_tool.rs  # Node.js → Rust migration
 │   │   │   └── repositories/
 │   │   ├── websocket/             # WebSocket server (Axum)
 │   │   ├── types/                 # Rust type definitions
 │   │   └── error.rs               # Error handling
-│   ├── tests/                     # Integration tests
+│   ├── tests/                     # Integration tests (38 tests)
+│   │   ├── common/                # Test utilities, fixtures, mocks
+│   │   ├── api/                   # API integration tests
+│   │   └── database/              # Migration tests
 │   └── benches/                   # Performance benchmarks
 │
 ├── server/                        # Node.js backend (LEGACY)
@@ -340,18 +368,20 @@ interface Agent {
 
 ## Implementation Status
 
-| Component       | Node.js | Rust | Notes                |
-| --------------- | ------- | ---- | -------------------- |
-| Frontend UI     | ✅      | ✅   | Shared               |
-| API Client      | ✅      | ✅   | Tauri IPC ready      |
-| Database Layer  | ✅      | ✅   | rusqlite + r2d2      |
-| Agent Service   | ✅      | ✅   | Scaffold complete    |
-| Process Manager | ✅      | ✅   | tokio + portable-pty |
-| Git Service     | ✅      | ✅   | git2-rs              |
-| WebSocket       | ✅      | ✅   | Axum WebSocket       |
-| Tauri Commands  | N/A     | ✅   | All endpoints        |
-| Testing         | ✅ 175+ | ⬜   | Port tests           |
-| CI/CD           | ✅      | ⬜   | Multi-platform       |
+| Component       | Node.js | Rust  | Notes                    |
+| --------------- | ------- | ----- | ------------------------ |
+| Frontend UI     | ✅      | ✅    | Shared                   |
+| API Client      | ✅      | ✅    | Tauri IPC ready          |
+| Database Layer  | ✅      | ✅    | rusqlite + r2d2          |
+| Agent Service   | ✅      | ✅    | Complete                 |
+| Process Manager | ✅      | ✅    | tokio + portable-pty     |
+| Git Service     | ✅      | ✅    | git2-rs                  |
+| WebSocket       | ✅      | ✅    | Axum WebSocket           |
+| Tauri Commands  | N/A     | ✅    | All endpoints            |
+| Testing         | ✅ 175+ | ✅ 68 | Unit + integration tests |
+| CI/CD           | ✅      | ✅    | Multi-platform builds    |
+| Data Migration  | N/A     | ✅    | Node.js → Rust migration |
+| Benchmarks      | ⬜      | ✅    | Criterion benchmarks     |
 
 ## Getting Started with Migration
 
