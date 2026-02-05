@@ -1,5 +1,12 @@
 # Claude Manager
 
+[![CI](https://github.com/ManMan88/ccmanger/actions/workflows/ci.yml/badge.svg)](https://github.com/ManMan88/ccmanger/actions/workflows/ci.yml)
+[![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
+[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
+[![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)](https://react.dev/)
+[![Playwright](https://img.shields.io/badge/Playwright-E2E%20Tests-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
+
 A desktop application for managing Claude Code CLI agents across git worktrees.
 
 ## Features
@@ -17,48 +24,50 @@ A desktop application for managing Claude Code CLI agents across git worktrees.
 
 ## Tech Stack
 
-| Category | Technology |
-|----------|------------|
-| Framework | React 18 + TypeScript |
-| Build Tool | Vite |
-| Styling | Tailwind CSS |
+| Category   | Technology                   |
+| ---------- | ---------------------------- |
+| Framework  | React 18 + TypeScript        |
+| Build Tool | Vite                         |
+| Styling    | Tailwind CSS                 |
 | Components | shadcn/ui (Radix primitives) |
-| State | React Hooks + React Query |
-| Forms | React Hook Form + Zod |
-| Icons | Lucide React |
+| State      | React Hooks + React Query    |
+| Forms      | React Hook Form + Zod        |
+| Icons      | Lucide React                 |
 
 ## Getting Started
 
 ### Prerequisites
 
-- Node.js 18+ (recommended: use [nvm](https://github.com/nvm-sh/nvm))
-- npm or bun
+- Node.js 20+ (recommended: use [nvm](https://github.com/nvm-sh/nvm))
+- pnpm (recommended) or npm
 
 ### Installation
 
 ```bash
 # Clone the repository
-git clone <repository-url>
-cd claude_manager
+git clone https://github.com/ManMan88/ccmanger.git
+cd ccmanger
 
 # Install dependencies
-npm install
+pnpm install
 
-# Start development server
-npm run dev
+# Start development server (frontend + backend)
+pnpm dev:all
 ```
 
 The app will be available at `http://localhost:8080`.
 
 ### Available Scripts
 
-| Command | Description |
-|---------|-------------|
-| `npm run dev` | Start development server with hot reload |
-| `npm run build` | Create production build |
-| `npm run preview` | Preview production build locally |
-| `npm run test` | Run tests with Vitest |
-| `npm run lint` | Run ESLint |
+| Command           | Description                       |
+| ----------------- | --------------------------------- |
+| `pnpm dev`        | Start frontend development server |
+| `pnpm dev:server` | Start backend development server  |
+| `pnpm dev:all`    | Start both frontend and backend   |
+| `pnpm build`      | Create production build           |
+| `pnpm test`       | Run frontend tests with Vitest    |
+| `pnpm test:e2e`   | Run E2E tests with Playwright     |
+| `pnpm lint`       | Run ESLint                        |
 
 ## Project Structure
 
@@ -91,29 +100,35 @@ claude_manager/
 
 ### Current State
 
-The application is currently a **frontend prototype** with mock data. All state is managed client-side using React hooks. Data does not persist between sessions.
+The application is a **full-stack application** with React frontend and Fastify backend. Features include:
 
-### Planned Backend: Node.js + Fastify
+- Real-time updates via WebSocket
+- SQLite database for persistence
+- React Query for server state management
+- 175+ backend tests passing
 
-The recommended backend stack is **Node.js + TypeScript** based on the following requirements:
+### Tech Stack: Node.js + Fastify
 
-| Requirement | Solution |
-|-------------|----------|
-| Framework | Fastify (faster than Express, excellent TS support) |
-| Git Operations | `simple-git` library |
-| Claude CLI Integration | `child_process.spawn()` with streaming |
-| Real-time Communication | WebSocket via `@fastify/websocket` |
-| Claude API | Official `@anthropic-ai/sdk` |
-| Data Persistence | SQLite via `better-sqlite3` or PostgreSQL |
+The backend stack is **Node.js + TypeScript** with the following technologies:
+
+| Requirement             | Solution                                            |
+| ----------------------- | --------------------------------------------------- |
+| Framework               | Fastify (faster than Express, excellent TS support) |
+| Git Operations          | `simple-git` library                                |
+| Claude CLI Integration  | `child_process.spawn()` with streaming              |
+| Real-time Communication | WebSocket via `@fastify/websocket`                  |
+| Claude API              | Official `@anthropic-ai/sdk`                        |
+| Data Persistence        | SQLite via `better-sqlite3` or PostgreSQL           |
 
 **Why Node.js:**
+
 - **Shared TypeScript types** between frontend and backend
 - **Official Anthropic SDK** with streaming support
 - **React Query integration** works naturally with REST endpoints
 - **Fast iteration** - same language, instant reload
 - **Excellent WebSocket support** for real-time agent updates
 
-### Backend Architecture
+### Backend Architecture (Implemented)
 
 ```
 server/
@@ -134,14 +149,15 @@ server/
 └── package.json
 ```
 
-### Backend Integration Points
+### Frontend-Backend Integration
 
-The following hooks/components are ready for backend integration:
+The frontend is fully integrated with the backend:
 
-- `useWorkspace.ts` - Replace mock data with React Query + REST calls
-- `AgentModal.tsx` - Connect chat interface to WebSocket streams
-- `WorktreeRow.tsx` - Connect git operations to API endpoints
-- `UsageBar.tsx` - Fetch usage stats from backend
+- `useWorkspace.ts` - React Query hooks with REST API calls
+- `useAgents.ts` - Agent CRUD operations with optimistic updates
+- `AgentModal.tsx` - Real-time chat via WebSocket streams
+- `WorktreeRow.tsx` - Git operations via API endpoints
+- `UsageBar.tsx` - Live usage statistics from backend
 
 ## Usage
 
@@ -164,12 +180,12 @@ The following hooks/components are ready for backend integration:
 
 ### Agent Status Indicators
 
-| Color | Status | Description |
-|-------|--------|-------------|
-| Green | Running | Agent is actively processing |
-| Yellow | Waiting | Agent awaits user input |
-| Red | Error | Agent encountered an error |
-| Gray | Finished | Agent completed its task |
+| Color  | Status   | Description                  |
+| ------ | -------- | ---------------------------- |
+| Green  | Running  | Agent is actively processing |
+| Yellow | Waiting  | Agent awaits user input      |
+| Red    | Error    | Agent encountered an error   |
+| Gray   | Finished | Agent completed its task     |
 
 ## Contributing
 
