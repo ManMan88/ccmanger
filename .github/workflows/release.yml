@@ -101,8 +101,12 @@ jobs:
           mkdir -p release
           cp -r dist release/
           cp -r server/dist release/server-dist
+          cp -r shared/dist release/shared-dist
           cp package.json release/
           cp server/package.json release/server-package.json
+          cp shared/package.json release/shared-package.json
+          cp pnpm-workspace.yaml release/
+          cp pnpm-lock.yaml release/
           cp ecosystem.config.js release/ 2>/dev/null || true
           cp -r scripts release/ 2>/dev/null || true
           cp README.md release/

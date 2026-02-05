@@ -310,14 +310,23 @@ main() {
             # For tarball installs, we still need to install production deps
             cd "$INSTALL_DIR"
             log_info "Installing production dependencies..."
-            # Create minimal package.json for server deps
-            cd "$INSTALL_DIR"
+
+            # Setup shared package (workspace dependency)
+            if [ -f "shared-package.json" ]; then
+                mkdir -p shared
+                mv shared-package.json shared/package.json
+                mv shared-dist shared/dist
+            fi
+
+            # Setup server package
             if [ -f "server-package.json" ]; then
                 mkdir -p server
                 mv server-package.json server/package.json
                 mv server-dist server/dist
             fi
-            pnpm install --prod --no-frozen-lockfile --ignore-scripts || npm install --production --ignore-scripts
+
+            # Install all workspace dependencies
+            pnpm install --prod --frozen-lockfile --ignore-scripts || pnpm install --prod --no-frozen-lockfile --ignore-scripts
         fi
     else
         install_from_source
