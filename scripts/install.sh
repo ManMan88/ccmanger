@@ -328,7 +328,9 @@ main() {
             fi
 
             # Install all workspace dependencies
-            pnpm install --prod --frozen-lockfile --ignore-scripts || pnpm install --prod --no-frozen-lockfile --ignore-scripts
+            # Note: better-sqlite3 needs to compile native bindings
+            # pnpm-workspace.yaml contains onlyBuiltDependencies to allow better-sqlite3 build scripts
+            pnpm install --prod --frozen-lockfile || pnpm install --prod --no-frozen-lockfile
         fi
     else
         install_from_source

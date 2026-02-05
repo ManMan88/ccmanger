@@ -2,3 +2,8 @@ packages:
   - '.'
   - 'server'
   - 'shared'
+
+# Allow better-sqlite3 to run its build scripts (compiles native bindings)
+# Required for pnpm v10+ which blocks lifecycle scripts by default
+onlyBuiltDependencies:
+  - better-sqlite3
