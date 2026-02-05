@@ -12,27 +12,52 @@ Claude Manager provides a visual interface to:
 - Configure agent modes (auto-approve/plan/regular) and permissions
 - View API usage statistics
 
-**Current State**: Full-stack application with React Query, WebSocket real-time updates, and backend API integration complete (Phases 0-4). Backend running with 175+ tests passing.
+**Current State**: Migrating from Node.js backend to Rust + Tauri native desktop application. The Node.js implementation is complete with 175+ tests. Rust migration is in progress.
+
+## 🚀 Migration Status: Node.js → Rust + Tauri
+
+This project is transitioning from a Node.js/Fastify backend to a native Rust backend packaged with Tauri. See [docs/09-rust-tauri-migration.md](docs/09-rust-tauri-migration.md) for the complete migration plan.
+
+### Why Migrate?
+
+- **Single Binary**: No separate backend process; one native app
+- **Performance**: Rust's zero-cost abstractions vs V8 overhead
+- **Memory**: Lower footprint without Node.js runtime
+- **Distribution**: Native installers (DMG, MSI, DEB, AppImage)
+- **Security**: Rust's memory safety + Tauri's security model
+
+### Migration Phases
+
+| Phase | Description | Status |
+|-------|-------------|--------|
+| 1 | Project Setup & Tauri Init | ⬜ Not Started |
+| 2 | Core Types & Database Layer | ⬜ Not Started |
+| 3 | Service Layer | ⬜ Not Started |
+| 4 | WebSocket Server | ⬜ Not Started |
+| 5 | Tauri Commands (IPC) | ⬜ Not Started |
+| 6 | Frontend Integration | ⬜ Not Started |
+| 7 | Build & Distribution | ⬜ Not Started |
+| 8 | Data Migration | ⬜ Not Started |
+| 9 | Comprehensive Testing | ⬜ Not Started |
 
 ## Documentation
 
-Comprehensive technical documentation is available in the `docs/` directory:
-
-| Document                                                               | Description                                      |
-| ---------------------------------------------------------------------- | ------------------------------------------------ |
-| [docs/README.md](docs/README.md)                                       | Documentation index and quick start              |
-| [docs/01-architecture-overview.md](docs/01-architecture-overview.md)   | System architecture, tech stack, design patterns |
-| [docs/02-api-specification.md](docs/02-api-specification.md)           | REST API & WebSocket specification               |
-| [docs/03-database-schema.md](docs/03-database-schema.md)               | SQLite schema and migrations                     |
-| [docs/04-backend-implementation.md](docs/04-backend-implementation.md) | Service layer implementation guide               |
-| [docs/05-testing-strategy.md](docs/05-testing-strategy.md)             | Unit, integration, and E2E testing               |
-| [docs/06-ci-cd-pipeline.md](docs/06-ci-cd-pipeline.md)                 | GitHub Actions and Docker setup                  |
-| [docs/07-implementation-phases.md](docs/07-implementation-phases.md)   | Phased delivery plan (7 phases)                  |
-| [docs/08-frontend-integration.md](docs/08-frontend-integration.md)     | React Query and WebSocket integration            |
+| Document | Description |
+|----------|-------------|
+| [docs/README.md](docs/README.md) | Documentation index and quick start |
+| [docs/09-rust-tauri-migration.md](docs/09-rust-tauri-migration.md) | **Rust + Tauri migration plan** |
+| [docs/01-architecture-overview.md](docs/01-architecture-overview.md) | System architecture, tech stack |
+| [docs/02-api-specification.md](docs/02-api-specification.md) | REST API & WebSocket specification |
+| [docs/03-database-schema.md](docs/03-database-schema.md) | SQLite schema and migrations |
+| [docs/04-backend-implementation.md](docs/04-backend-implementation.md) | Node.js service layer (legacy) |
+| [docs/05-testing-strategy.md](docs/05-testing-strategy.md) | Node.js testing (legacy) |
+| [docs/06-ci-cd-pipeline.md](docs/06-ci-cd-pipeline.md) | GitHub Actions and Docker setup |
+| [docs/07-implementation-phases.md](docs/07-implementation-phases.md) | Node.js phased delivery (legacy) |
+| [docs/08-frontend-integration.md](docs/08-frontend-integration.md) | React Query and WebSocket integration |
 
 ## Tech Stack
 
-### Frontend (Implemented)
+### Frontend (Shared between Node.js and Tauri)
 
 - **Framework**: React 18.3 + TypeScript
 - **Build Tool**: Vite 5.4
@@ -42,14 +67,23 @@ Comprehensive technical documentation is available in the `docs/` directory:
 - **Forms**: React Hook Form + Zod validation
 - **Icons**: Lucide React
 
-### Backend (Implemented)
+### Backend - Rust/Tauri (Target)
+
+- **Runtime**: Tauri 2.x + Tokio async runtime
+- **Framework**: Axum (WebSocket server)
+- **Database**: rusqlite + r2d2 connection pool
+- **Git**: git2-rs
+- **Process Management**: tokio::process + portable-pty
+- **Serialization**: serde + serde_json
+
+### Backend - Node.js (Legacy)
 
 - **Runtime**: Node.js 20 LTS
 - **Framework**: Fastify 4.x
 - **Database**: SQLite (better-sqlite3)
 - **Real-time**: @fastify/websocket
 - **Git**: simple-git
-- **Process Management**: child_process for Claude CLI
+- **Process Management**: child_process
 - **Validation**: Zod
 
 ## Project Structure
@@ -57,44 +91,53 @@ Comprehensive technical documentation is available in the `docs/` directory:
 ```
 claude-manager/
 ├── docs/                          # Technical documentation
-│   ├── README.md                  # Documentation index
-│   ├── 01-architecture-overview.md
-│   ├── 02-api-specification.md
-│   ├── 03-database-schema.md
-│   ├── 04-backend-implementation.md
-│   ├── 05-testing-strategy.md
-│   ├── 06-ci-cd-pipeline.md
-│   ├── 07-implementation-phases.md
-│   └── 08-frontend-integration.md
+│   ├── 09-rust-tauri-migration.md # Migration plan (START HERE)
+│   └── ...
 │
-├── src/                           # Frontend source
+├── src/                           # Frontend source (React)
 │   ├── pages/
 │   │   └── Index.tsx              # Main dashboard page
 │   ├── components/
-│   │   ├── Toolbar.tsx            # Top navigation bar with connection status
+│   │   ├── Toolbar.tsx            # Top navigation bar
 │   │   ├── WorktreeRow.tsx        # Worktree container with agents
 │   │   ├── AgentBox.tsx           # Individual agent card
-│   │   ├── AgentModal.tsx         # Agent interaction dialog with real-time chat
-│   │   ├── AddWorktreeDialog.tsx
-│   │   ├── SettingsDialog.tsx
-│   │   ├── UsageBar.tsx           # API usage display
+│   │   ├── AgentModal.tsx         # Agent interaction dialog
 │   │   └── ui/                    # shadcn/ui components (40+)
 │   ├── hooks/
 │   │   ├── useWorkspace.ts        # Workspace state with React Query
 │   │   ├── useAgents.ts           # Agent queries and mutations
-│   │   ├── useUsage.ts            # Usage statistics
-│   │   ├── useWebSocket.ts        # WebSocket connection hooks
-│   │   └── useTheme.ts            # Light/dark theme toggle
+│   │   └── useWebSocket.ts        # WebSocket connection hooks
 │   ├── lib/
-│   │   ├── api.ts                 # Typed API client
-│   │   ├── queryClient.ts         # React Query configuration
-│   │   ├── queryKeys.ts           # Query key factory
+│   │   ├── api.ts                 # Typed API client (HTTP + Tauri IPC)
 │   │   ├── websocket.ts           # WebSocket client
-│   │   └── utils.ts               # Tailwind merge utilities
+│   │   └── queryClient.ts         # React Query configuration
 │   └── types/
-│       └── agent.ts               # Frontend-specific type aliases
+│       └── agent.ts               # Frontend type definitions
 │
-├── server/                        # Backend (implemented)
+├── src-tauri/                     # Rust backend (Tauri) - IN PROGRESS
+│   ├── Cargo.toml                 # Rust dependencies
+│   ├── src/
+│   │   ├── main.rs                # Tauri application entry
+│   │   ├── lib.rs                 # Library exports
+│   │   ├── commands/              # Tauri IPC commands
+│   │   │   ├── agent_commands.rs
+│   │   │   ├── workspace_commands.rs
+│   │   │   └── worktree_commands.rs
+│   │   ├── services/              # Business logic
+│   │   │   ├── agent_service.rs
+│   │   │   ├── process_service.rs
+│   │   │   └── git_service.rs
+│   │   ├── db/                    # Database layer
+│   │   │   ├── connection.rs
+│   │   │   ├── migrations.rs
+│   │   │   └── repositories/
+│   │   ├── websocket/             # WebSocket server (Axum)
+│   │   ├── types/                 # Rust type definitions
+│   │   └── error.rs               # Error handling
+│   ├── tests/                     # Integration tests
+│   └── benches/                   # Performance benchmarks
+│
+├── server/                        # Node.js backend (LEGACY)
 │   ├── src/
 │   │   ├── routes/                # REST API endpoints
 │   │   ├── services/              # Business logic layer
@@ -106,67 +149,67 @@ claude-manager/
     └── src/index.ts               # API types and converters
 ```
 
-## Key Frontend Files
-
-| File                             | Purpose                                                          |
-| -------------------------------- | ---------------------------------------------------------------- |
-| `src/lib/api.ts`                 | Typed API client for all REST endpoints                          |
-| `src/lib/websocket.ts`           | WebSocket client with auto-reconnect and subscription management |
-| `src/hooks/useWorkspace.ts`      | React Query hooks for workspace state management                 |
-| `src/hooks/useAgents.ts`         | React Query hooks for agent CRUD and process control             |
-| `src/hooks/useWebSocket.ts`      | Hooks for WebSocket connection and subscriptions                 |
-| `src/components/AgentBox.tsx`    | Agent card with status, context level, mode/permission controls  |
-| `src/components/AgentModal.tsx`  | Agent interaction dialog with real-time message streaming        |
-| `src/components/WorktreeRow.tsx` | Worktree container with drag-drop, sorting, agent management     |
-| `src/pages/Index.tsx`            | Main page with loading/error states and WebSocket integration    |
-
 ## Development Commands
 
 ```bash
-# Frontend
-npm install          # Install dependencies
-npm run dev          # Start dev server (port 8080)
-npm run build        # Production build
-npm run test         # Run tests (Vitest)
-npm run lint         # ESLint check
+# Frontend development (works with both backends)
+pnpm install              # Install dependencies
+pnpm dev                  # Start Vite dev server (port 8080)
+pnpm build                # Production build
+pnpm test                 # Run frontend tests (Vitest)
+pnpm lint                 # ESLint check
 
-# Backend (after implementation)
+# Rust/Tauri development (TARGET)
+cd src-tauri
+cargo build               # Build Rust backend
+cargo test                # Run Rust tests
+cargo test --lib          # Unit tests only
+cargo test --test '*'     # Integration tests only
+cargo bench               # Run benchmarks
+pnpm tauri dev            # Start Tauri dev mode (from root)
+pnpm tauri build          # Build native application
+
+# Node.js backend (LEGACY)
 cd server
-npm run dev          # Start dev server (port 3001)
-npm run test         # Run backend tests
-npm run migrate      # Run database migrations
-```
-
-## Type Definitions
-
-Core types in `src/types/agent.ts`:
-
-```typescript
-interface Agent {
-  id: string
-  name: string
-  status: 'running' | 'waiting' | 'error' | 'finished'
-  contextLevel: number // 0-100 percentage
-  mode: 'auto' | 'plan' | 'regular'
-  permissions: string[] // ['read', 'write', 'execute']
-  worktreeId: string
-  createdAt: Date
-  order: number
-}
-
-interface Worktree {
-  id: string
-  name: string
-  branch: string
-  path: string
-  agents: Agent[]
-  previousAgents: Agent[] // Deleted agents for history
-  sortMode: 'free' | 'status' | 'name'
-  order: number
-}
+pnpm dev                  # Start dev server (port 3001)
+pnpm test                 # Run backend tests
+pnpm migrate              # Run database migrations
 ```
 
 ## Architecture Overview
+
+### Target Architecture (Tauri)
+
+```
+┌───────────────────────────────────────────────────────────────┐
+│                     Tauri Application                          │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │              WebView (Frontend)                          │  │
+│  │         React + TypeScript + Tailwind                   │  │
+│  └─────────────────────────────────────────────────────────┘  │
+│                          │                                     │
+│                    Tauri Commands (IPC)                        │
+│                          │                                     │
+│  ┌─────────────────────────────────────────────────────────┐  │
+│  │               Rust Backend Core                          │  │
+│  │  ┌─────────────┐ ┌─────────────┐ ┌─────────────┐       │  │
+│  │  │   Services  │ │   SQLite    │ │  WebSocket  │       │  │
+│  │  │   (Axum)    │ │  (rusqlite) │ │  (tokio-ws) │       │  │
+│  │  └─────────────┘ └─────────────┘ └─────────────┘       │  │
+│  │                        │                                 │  │
+│  │  ┌─────────────────────────────────────────────────┐   │  │
+│  │  │     Process Manager (tokio::process)             │   │  │
+│  │  └─────────────────────────────────────────────────┘   │  │
+│  └─────────────────────────────────────────────────────────┘  │
+└───────────────────────────────────────────────────────────────┘
+                                │
+                                ▼
+                       ┌─────────────────┐
+                       │ Claude Code CLI │
+                       └─────────────────┘
+```
+
+### Legacy Architecture (Node.js)
 
 ```
 ┌─────────────────────────────────────────────────────────────────┐
@@ -187,51 +230,86 @@ interface Worktree {
 │                      Data Layer                                  │
 │  SQLite (better-sqlite3) + File System (git repos, logs)        │
 └─────────────────────────────────────────────────────────────────┘
-                    │
-                    ▼
-┌─────────────────────────────────────────────────────────────────┐
-│                   External Systems                               │
-│  Claude Code CLI | Git CLI | Anthropic API (optional)           │
-└─────────────────────────────────────────────────────────────────┘
 ```
 
-See [docs/01-architecture-overview.md](docs/01-architecture-overview.md) for detailed architecture documentation.
+## Key Types
 
-## Implementation Status
+### Rust Types (src-tauri/src/types/)
 
-| Component                      | Status      | Documentation                                        |
-| ------------------------------ | ----------- | ---------------------------------------------------- |
-| Frontend UI                    | ✅ Complete | -                                                    |
-| Frontend Integration (Phase 4) | ✅ Complete | [Integration Guide](docs/08-frontend-integration.md) |
-| Backend API (Phase 0-1)        | ✅ Complete | [API Spec](docs/02-api-specification.md)             |
-| Database                       | ✅ Complete | [Schema](docs/03-database-schema.md)                 |
-| Process Management (Phase 2)   | ✅ Complete | [Implementation](docs/04-backend-implementation.md)  |
-| WebSocket (Phase 3)            | ✅ Complete | [API Spec](docs/02-api-specification.md)             |
-| CI/CD                          | ✅ Complete | [Pipeline](docs/06-ci-cd-pipeline.md)                |
-| Testing                        | ✅ Complete | [Strategy](docs/05-testing-strategy.md)              |
+```rust
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Agent {
+    pub id: String,
+    pub worktree_id: String,
+    pub name: String,
+    pub status: AgentStatus,      // Running, Waiting, Error, Finished
+    pub context_level: i32,       // 0-100 percentage
+    pub mode: AgentMode,          // Auto, Plan, Regular
+    pub permissions: Vec<Permission>, // Read, Write, Execute
+    pub display_order: i32,
+    pub pid: Option<i32>,
+    pub session_id: Option<String>,
+    pub created_at: String,
+    pub updated_at: String,
+    // ...
+}
 
-**Backend Test Coverage:** 175 tests passing (unit + integration)
-
-### Phase 4 Integration Details
-
-- **API Client**: Typed client with error handling in `src/lib/api.ts`
-- **React Query**: Full integration with optimistic updates and cache invalidation
-- **WebSocket**: Auto-reconnect, subscriptions, real-time cache updates
-- **Components**: Loading states, error boundaries, data-testid attributes
-
-## Component Hierarchy
-
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct Worktree {
+    pub id: String,
+    pub workspace_id: String,
+    pub name: String,
+    pub branch: String,
+    pub path: String,
+    pub sort_mode: SortMode,      // Free, Status, Name
+    pub display_order: i32,
+    pub is_main: bool,
+    // ...
+}
 ```
-App (QueryClient, Router, Tooltips)
-└── Index (useWorkspace, useUsage, useWebSocket)
-    ├── Toolbar (theme toggle, workspace selector, connection status)
-    ├── WorktreeRow[] (per worktree)
-    │   └── AgentBox[] (draggable agent cards with real-time status)
-    ├── UsageBar (real-time API usage stats)
-    ├── AgentModal (agent chat with message streaming)
-    ├── AddWorktreeDialog
-    └── SettingsDialog
+
+### TypeScript Types (src/types/)
+
+```typescript
+interface Agent {
+  id: string
+  name: string
+  status: 'running' | 'waiting' | 'error' | 'finished'
+  contextLevel: number
+  mode: 'auto' | 'plan' | 'regular'
+  permissions: ('read' | 'write' | 'execute')[]
+  worktreeId: string
+  createdAt: string
+  order: number
+}
 ```
+
+## Testing Strategy
+
+### Rust Tests (Target)
+
+| Category | Coverage Target | Location |
+|----------|-----------------|----------|
+| Unit Tests | 80-90% | `src/**/*.rs` (`#[cfg(test)]` modules) |
+| Integration Tests | 70-80% | `tests/` directory |
+| E2E Tests | Critical paths | `tests/e2e/` |
+| Benchmarks | Performance baseline | `benches/` |
+
+**Critical paths requiring 95%+ coverage:**
+- Agent spawning and lifecycle
+- Message send/receive flow
+- Git worktree operations
+- WebSocket streaming
+- Database migrations
+
+### Node.js Tests (Legacy)
+
+- **175+ tests passing** (unit + integration)
+- Vitest for unit tests
+- Supertest for API integration
+- Playwright for E2E
 
 ## Agent Status Colors
 
@@ -239,3 +317,36 @@ App (QueryClient, Router, Tooltips)
 - **Waiting** (yellow/orange): Awaiting user input
 - **Error** (red): Agent encountered an error
 - **Finished** (gray): Agent completed
+
+## Implementation Status
+
+| Component | Node.js | Rust | Notes |
+|-----------|---------|------|-------|
+| Frontend UI | ✅ | ✅ | Shared |
+| API Client | ✅ | ⬜ | Adding Tauri IPC |
+| Database Layer | ✅ | ⬜ | Same SQLite schema |
+| Agent Service | ✅ | ⬜ | Port in progress |
+| Process Manager | ✅ | ⬜ | tokio::process |
+| Git Service | ✅ | ⬜ | git2-rs |
+| WebSocket | ✅ | ⬜ | Axum WebSocket |
+| Tauri Commands | N/A | ⬜ | New IPC layer |
+| Testing | ✅ 175+ | ⬜ | Port tests |
+| CI/CD | ✅ | ⬜ | Multi-platform |
+
+## Getting Started with Migration
+
+1. **Read the migration plan**: [docs/09-rust-tauri-migration.md](docs/09-rust-tauri-migration.md)
+2. **Install Rust toolchain**: `curl --proto '=https' --tlsv1.2 -sSf https://sh.rustup.rs | sh`
+3. **Install Tauri CLI**: `cargo install tauri-cli`
+4. **Start Tauri dev mode**: `pnpm tauri dev`
+
+## Contributing
+
+When contributing to the Rust migration:
+
+1. Follow Rust idioms and conventions
+2. Write tests alongside code (TDD recommended)
+3. Use `cargo clippy` for linting
+4. Use `cargo fmt` for formatting
+5. Document public APIs with rustdoc comments
+6. Keep parity with Node.js API contracts
