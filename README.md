@@ -9,7 +9,22 @@
 
 A desktop application for managing Claude Code CLI agents across git worktrees.
 
-## Quick Start
+## Installation
+
+### Quick Install (One Command)
+
+```bash
+curl -fsSL https://raw.githubusercontent.com/ManMan88/ccmanger/master/scripts/install.sh | bash
+```
+
+This will:
+
+- Check prerequisites (Node.js 20+, pnpm, git)
+- Download and install the latest release
+- Set up data directories
+- Start the server
+
+Open http://localhost:8080 in your browser.
 
 ### Prerequisites
 
@@ -18,7 +33,9 @@ A desktop application for managing Claude Code CLI agents across git worktrees.
 - **Git** - [Download](https://git-scm.com/)
 - **Claude Code CLI** - Installed and authenticated
 
-### Installation
+### Manual Installation
+
+For more control over the installation:
 
 ```bash
 # Clone the repository
@@ -28,23 +45,52 @@ cd ccmanger
 # Install dependencies
 pnpm install
 
-# Start development servers
-./scripts/start-dev.sh
-```
-
-Open http://localhost:8080 in your browser.
-
-### Production Deployment
-
-```bash
-# Build for production
+# Build the application
 ./scripts/build.sh
 
 # Start in production mode
 ./scripts/start-prod.sh
+```
 
-# Or use PM2 for process management
+### Development Setup
+
+```bash
+# Clone and install
+git clone https://github.com/ManMan88/ccmanger.git
+cd ccmanger
+pnpm install
+
+# Start development servers (hot reload)
+./scripts/start-dev.sh
+```
+
+### Install Options
+
+The install script supports several options via environment variables:
+
+```bash
+# Install to custom directory
+INSTALL_DIR=/opt/claude-manager curl -fsSL .../install.sh | bash
+
+# Install specific version
+VERSION=v1.0.0 curl -fsSL .../install.sh | bash
+
+# Install without starting the server
+SKIP_START=1 curl -fsSL .../install.sh | bash
+```
+
+### Using PM2 (Recommended for Production)
+
+```bash
+# Install PM2 globally
+npm install -g pm2
+
+# Start with PM2
 pm2 start ecosystem.config.js --env production
+
+# Auto-start on boot
+pm2 save
+pm2 startup
 ```
 
 ---
