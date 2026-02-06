@@ -14,6 +14,7 @@ import { Plus, FolderOpen, Loader2, WifiOff, RefreshCw } from 'lucide-react'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Alert, AlertDescription } from '@/components/ui/alert'
 import type { Agent } from '@claude-manager/shared'
+import { openDirectoryPicker } from '@/lib/api'
 
 const Index = () => {
   const { theme, toggleTheme } = useTheme()
@@ -68,9 +69,7 @@ const Index = () => {
   }, [selectedWorkspaceId, workspaces])
 
   const handleOpenWorkspace = async () => {
-    // In a real app, this would open a file picker
-    // For now, we'll create a placeholder
-    const path = prompt('Enter the path to a Git repository:')
+    const path = await openDirectoryPicker()
     if (path) {
       try {
         createWorkspace(path)

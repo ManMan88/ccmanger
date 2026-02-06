@@ -635,5 +635,25 @@ export const api = {
   },
 }
 
+// Dialog utilities
+export async function openDirectoryPicker(): Promise<string | null> {
+  if (!isTauri) {
+    // Fallback for non-Tauri environments
+    return prompt('Enter the path to a Git repository:')
+  }
+  const { open } = await import('@tauri-apps/plugin-dialog')
+  const { homeDir } = await import('@tauri-apps/api/path')
+
+  const home = await homeDir()
+  const selected = await open({
+    directory: true,
+    multiple: false,
+    defaultPath: home,
+    title: 'Select Git Repository',
+  })
+
+  return selected as string | null
+}
+
 // Export isTauri check for other modules
 export { isTauri }
