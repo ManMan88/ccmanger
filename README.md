@@ -26,15 +26,57 @@ A native desktop application for managing Claude Code CLI agents across git work
 
 ## Installation
 
+### Download Pre-built Binaries (Recommended)
+
+Download the latest release for your platform from the [Releases page](https://github.com/ManMan88/ccmanger/releases):
+
+| Platform    | File                                         | Notes                                    |
+| ----------- | -------------------------------------------- | ---------------------------------------- |
+| **Linux**   | `claude-manager-x.x.x-linux-x86_64.AppImage` | Recommended - runs on most distributions |
+| **Linux**   | `claude-manager-x.x.x-linux-x86_64.deb`      | For Debian/Ubuntu-based systems          |
+| **macOS**   | `claude-manager-x.x.x-macos-x86_64.dmg`      | Intel Macs                               |
+| **macOS**   | `claude-manager-x.x.x-macos-aarch64.dmg`     | Apple Silicon (M1/M2/M3)                 |
+| **Windows** | `claude-manager-x.x.x-windows-x86_64.msi`    | Windows installer                        |
+
+#### Linux AppImage
+
+```bash
+# Download and make executable
+chmod +x claude-manager-*.AppImage
+
+# Run
+./claude-manager-*.AppImage
+```
+
+#### macOS
+
+1. Download the `.dmg` file for your architecture
+2. Open the DMG and drag Claude Manager to Applications
+3. On first run, right-click and select "Open" to bypass Gatekeeper
+
+#### Windows
+
+1. Download the `.msi` installer
+2. Run the installer and follow the prompts
+
 ### Prerequisites
+
+Before using Claude Manager, ensure you have:
+
+- **Git** - [Download](https://git-scm.com/)
+- **Claude Code CLI** - Installed and authenticated (`claude --version` should work)
+
+### Build from Source
+
+If you prefer to build from source:
+
+#### Prerequisites for Building
 
 - **Rust 1.75+** - [Install](https://rustup.rs/)
 - **pnpm** - `npm install -g pnpm`
-- **Git** - [Download](https://git-scm.com/)
-- **Claude Code CLI** - Installed and authenticated
 - **Platform dependencies** - See [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
 
-### Build from Source
+#### Build Steps
 
 ```bash
 # Clone the repository
@@ -48,7 +90,11 @@ pnpm install
 pnpm tauri build
 ```
 
-The built application will be in `src-tauri/target/release/bundle/`.
+The built application will be in `src-tauri/target/release/bundle/`:
+
+- Linux: `src-tauri/target/release/bundle/appimage/` and `src-tauri/target/release/bundle/deb/`
+- macOS: `src-tauri/target/release/bundle/dmg/`
+- Windows: `src-tauri/target/release/bundle/msi/`
 
 ### Development Setup
 
