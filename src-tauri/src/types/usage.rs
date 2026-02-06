@@ -107,3 +107,61 @@ pub struct UsageHistoryResponse {
     pub history: Vec<UsageStats>,
     pub period: UsagePeriod,
 }
+
+// ============================================================================
+// Claude API Usage Types (for fetching from api.anthropic.com)
+// ============================================================================
+
+/// Single usage bucket from Claude API
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClaudeUsageBucket {
+    pub utilization: f64,
+    pub resets_at: Option<String>,
+}
+
+/// Response from Claude API /api/oauth/usage endpoint
+#[derive(Debug, Clone, Deserialize)]
+pub struct ClaudeApiUsageResponse {
+    pub five_hour: Option<ClaudeUsageBucket>,
+    pub seven_day: Option<ClaudeUsageBucket>,
+    pub seven_day_opus: Option<ClaudeUsageBucket>,
+    #[serde(default)]
+    pub seven_day_oauth_apps: Option<ClaudeUsageBucket>,
+    #[serde(default)]
+    pub iguana_necktie: Option<serde_json::Value>,
+}
+
+/// Usage limit entry for frontend
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct UsageLimitEntry {
+    pub used: f64,
+    pub limit: f64,
+    pub reset_time: String,
+}
+
+/// Claude usage summary for frontend (matches expected format)
+#[derive(Debug, Clone, Serialize, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeUsageSummary {
+    pub daily: UsageLimitEntry,
+    pub weekly: UsageLimitEntry,
+    pub sonnet_only: UsageLimitEntry,
+}
+
+/// Claude credentials stored in ~/.claude/.credentials.json
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeCredentials {
+    pub claude_ai_oauth: Option<ClaudeOAuthCredentials>,
+}
+
+/// OAuth credentials from Claude CLI
+#[derive(Debug, Clone, Deserialize)]
+#[serde(rename_all = "camelCase")]
+pub struct ClaudeOAuthCredentials {
+    pub access_token: String,
+    pub refresh_token: Option<String>,
+    pub expires_at: Option<String>,
+    pub subscription_type: Option<String>,
+}

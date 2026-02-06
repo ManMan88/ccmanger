@@ -585,7 +585,8 @@ export const api = {
   usage: {
     get: async () => {
       if (isTauri) {
-        return tauriInvoke<UsageSummary>('get_usage')
+        // Fetch from Claude API via backend
+        return tauriInvoke<UsageSummary>('get_claude_usage')
       }
       return request<UsageSummary>('/api/usage')
     },

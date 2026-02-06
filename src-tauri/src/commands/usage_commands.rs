@@ -2,7 +2,10 @@
 
 use tauri::State;
 
-use crate::types::{UsageHistoryResponse, UsageLimits, UsagePeriod, UsageStats, UsageSummary};
+use crate::services::ClaudeApiService;
+use crate::types::{
+    ClaudeUsageSummary, UsageHistoryResponse, UsageLimits, UsagePeriod, UsageStats, UsageSummary,
+};
 use crate::AppState;
 
 /// Get current usage summary
@@ -54,4 +57,11 @@ pub async fn get_usage_limits(
         .usage_service
         .get_usage_limits()
         .map_err(|e| e.to_string())
+}
+
+/// Get Claude API usage (fetches from Anthropic API)
+#[tauri::command]
+pub async fn get_claude_usage() -> Result<ClaudeUsageSummary, String> {
+    let service = ClaudeApiService::new();
+    service.fetch_usage().await.map_err(|e| e.to_string())
 }

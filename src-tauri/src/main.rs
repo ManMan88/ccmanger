@@ -115,6 +115,7 @@ fn main() {
             commands::get_usage_history,
             commands::get_usage_today,
             commands::get_usage_limits,
+            commands::get_claude_usage,
         ])
         .on_window_event(|window, event| {
             if let tauri::WindowEvent::CloseRequested { .. } = event {
