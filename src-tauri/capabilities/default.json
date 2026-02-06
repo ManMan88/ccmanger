@@ -1,0 +1,19 @@
+{
+  "$schema": "https://raw.githubusercontent.com/tauri-apps/tauri/dev/crates/tauri-utils/schema/capabilities.schema.json",
+  "identifier": "default",
+  "description": "Default capabilities for Claude Manager",
+  "windows": ["main"],
+  "permissions": [
+    "core:default",
+    "shell:allow-open",
+    {
+      "identifier": "fs:default",
+      "allow": [
+        { "path": "$HOME/**" },
+        { "path": "$APPDATA/**" },
+        { "path": "$LOCALAPPDATA/**" },
+        { "path": "$RESOURCE/**" }
+      ]
+    }
+  ]
+}

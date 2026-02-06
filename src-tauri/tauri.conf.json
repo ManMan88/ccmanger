@@ -69,9 +69,7 @@
       "open": true
     },
     "fs": {
-      "scope": {
-        "allow": ["$HOME/**", "$APPDATA/**", "$LOCALAPPDATA/**", "$RESOURCE/**"]
-      }
+      "requireLiteralLeadingDot": false
     }
   }
 }
