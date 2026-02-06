@@ -1,6 +1,6 @@
 [package]
 name = "claude-manager"
-version = "1.0.0"
+version = "1.1.0"
 description = "A GUI application for managing Claude Code CLI agents across git worktrees"
 authors = ["Claude Manager Team"]
 edition = "2021"
