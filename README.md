@@ -2,98 +2,12 @@
 
 [![CI](https://github.com/ManMan88/ccmanger/actions/workflows/ci.yml/badge.svg)](https://github.com/ManMan88/ccmanger/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-yellow.svg)](https://opensource.org/licenses/MIT)
-[![Node.js](https://img.shields.io/badge/Node.js-20+-339933?logo=node.js&logoColor=white)](https://nodejs.org/)
+[![Rust](https://img.shields.io/badge/Rust-1.75+-B7410E?logo=rust&logoColor=white)](https://www.rust-lang.org/)
+[![Tauri](https://img.shields.io/badge/Tauri-2.x-FFC131?logo=tauri&logoColor=black)](https://tauri.app/)
 [![TypeScript](https://img.shields.io/badge/TypeScript-5.8+-3178C6?logo=typescript&logoColor=white)](https://www.typescriptlang.org/)
 [![React](https://img.shields.io/badge/React-18.3-61DAFB?logo=react&logoColor=black)](https://react.dev/)
-[![Playwright](https://img.shields.io/badge/Playwright-E2E%20Tests-2EAD33?logo=playwright&logoColor=white)](https://playwright.dev/)
 
-A desktop application for managing Claude Code CLI agents across git worktrees.
-
-## Installation
-
-### Quick Install (One Command)
-
-```bash
-curl -fsSL https://raw.githubusercontent.com/ManMan88/ccmanger/master/scripts/install.sh | bash
-```
-
-This will:
-
-- Check prerequisites (Node.js 20+, pnpm, git)
-- Download and install the latest release
-- Set up data directories
-- Start the server
-
-Open http://localhost:8080 in your browser.
-
-### Prerequisites
-
-- **Node.js 20+** - [Download](https://nodejs.org/) or use [nvm](https://github.com/nvm-sh/nvm)
-- **pnpm** - `npm install -g pnpm`
-- **Git** - [Download](https://git-scm.com/)
-- **Claude Code CLI** - Installed and authenticated
-
-### Manual Installation
-
-For more control over the installation:
-
-```bash
-# Clone the repository
-git clone https://github.com/ManMan88/ccmanger.git
-cd ccmanger
-
-# Install dependencies
-pnpm install
-
-# Build the application
-./scripts/build.sh
-
-# Start in production mode
-./scripts/start-prod.sh
-```
-
-### Development Setup
-
-```bash
-# Clone and install
-git clone https://github.com/ManMan88/ccmanger.git
-cd ccmanger
-pnpm install
-
-# Start development servers (hot reload)
-./scripts/start-dev.sh
-```
-
-### Install Options
-
-The install script supports several options via environment variables:
-
-```bash
-# Install to custom directory
-INSTALL_DIR=/opt/claude-manager curl -fsSL .../install.sh | bash
-
-# Install specific version
-VERSION=v1.0.0 curl -fsSL .../install.sh | bash
-
-# Install without starting the server
-SKIP_START=1 curl -fsSL .../install.sh | bash
-```
-
-### Using PM2 (Recommended for Production)
-
-```bash
-# Install PM2 globally
-npm install -g pm2
-
-# Start with PM2
-pm2 start ecosystem.config.js --env production
-
-# Auto-start on boot
-pm2 save
-pm2 startup
-```
-
----
+A native desktop application for managing Claude Code CLI agents across git worktrees.
 
 ## Features
 
@@ -110,23 +24,43 @@ pm2 startup
 
 ---
 
-## Documentation
+## Installation
 
-| Document                                          | Description                        |
-| ------------------------------------------------- | ---------------------------------- |
-| [User Guide](docs/user-guide.md)                  | How to use Claude Manager          |
-| [Configuration](docs/configuration.md)            | Environment variables and settings |
-| [Troubleshooting](docs/troubleshooting.md)        | Common issues and solutions        |
-| [API Specification](docs/02-api-specification.md) | REST API and WebSocket events      |
-| [Architecture](docs/01-architecture-overview.md)  | System design and patterns         |
+### Prerequisites
 
-### API Documentation
+- **Rust 1.75+** - [Install](https://rustup.rs/)
+- **pnpm** - `npm install -g pnpm`
+- **Git** - [Download](https://git-scm.com/)
+- **Claude Code CLI** - Installed and authenticated
+- **Platform dependencies** - See [Tauri Prerequisites](https://tauri.app/v1/guides/getting-started/prerequisites)
 
-Interactive API documentation is available at:
+### Build from Source
 
-- **Swagger UI**: http://localhost:3001/api/docs/ui
-- **OpenAPI JSON**: http://localhost:3001/api/docs
-- **OpenAPI YAML**: http://localhost:3001/api/docs/yaml
+```bash
+# Clone the repository
+git clone https://github.com/ManMan88/ccmanger.git
+cd ccmanger
+
+# Install dependencies
+pnpm install
+
+# Build native application
+pnpm tauri build
+```
+
+The built application will be in `src-tauri/target/release/bundle/`.
+
+### Development Setup
+
+```bash
+# Clone and install
+git clone https://github.com/ManMan88/ccmanger.git
+cd ccmanger
+pnpm install
+
+# Start development mode (hot reload)
+pnpm tauri dev
+```
 
 ---
 
@@ -144,32 +78,32 @@ Interactive API documentation is available at:
 | Real-time  | WebSocket with auto-reconnect |
 | Forms      | React Hook Form + Zod         |
 
-### Backend
+### Backend (Rust/Tauri)
 
-| Category   | Technology              |
-| ---------- | ----------------------- |
-| Runtime    | Node.js 20 LTS          |
-| Framework  | Fastify 4.x             |
-| Database   | SQLite (better-sqlite3) |
-| Real-time  | @fastify/websocket      |
-| Git        | simple-git              |
-| Validation | Zod                     |
+| Category           | Technology                    |
+| ------------------ | ----------------------------- |
+| Runtime            | Tauri 2.x + Tokio             |
+| Framework          | Axum (WebSocket server)       |
+| Database           | rusqlite + r2d2 pool          |
+| Git                | git2-rs                       |
+| Process Management | tokio::process                |
+| Serialization      | serde + serde_json            |
+| Tests              | 68 tests (unit + integration) |
 
 ---
 
-## Available Scripts
+## Available Commands
 
-| Command                                     | Description                                  |
-| ------------------------------------------- | -------------------------------------------- |
-| `./scripts/start-dev.sh`                    | Start frontend + backend in development mode |
-| `./scripts/build.sh`                        | Create production build                      |
-| `./scripts/start-prod.sh`                   | Start in production mode                     |
-| `pnpm dev`                                  | Start frontend only                          |
-| `pnpm dev:server`                           | Start backend only                           |
-| `pnpm test`                                 | Run frontend tests                           |
-| `pnpm test:e2e`                             | Run E2E tests with Playwright                |
-| `pnpm --filter @claude-manager/server test` | Run backend tests                            |
-| `pnpm lint`                                 | Run ESLint                                   |
+| Command                        | Description                     |
+| ------------------------------ | ------------------------------- |
+| `pnpm tauri dev`               | Start in development mode       |
+| `pnpm tauri build`             | Build native application        |
+| `cd src-tauri && cargo test`   | Run Rust tests (68 tests)       |
+| `cd src-tauri && cargo bench`  | Run performance benchmarks      |
+| `cd src-tauri && cargo clippy` | Run Rust linter                 |
+| `pnpm dev`                     | Start frontend only (port 8080) |
+| `pnpm test`                    | Run frontend tests              |
+| `pnpm lint`                    | Run ESLint                      |
 
 ---
 
@@ -177,7 +111,7 @@ Interactive API documentation is available at:
 
 ```
 claude-manager/
-├── src/                    # Frontend source
+├── src/                    # Frontend source (React)
 │   ├── pages/              # Page components
 │   ├── components/         # React components
 │   │   ├── ui/             # shadcn/ui components
@@ -186,19 +120,18 @@ claude-manager/
 │   ├── lib/                # Utilities and API client
 │   └── types/              # TypeScript types
 │
-├── server/                 # Backend source
+├── src-tauri/              # Rust backend (Tauri)
 │   ├── src/
-│   │   ├── routes/         # REST API endpoints
+│   │   ├── commands/       # Tauri IPC commands
 │   │   ├── services/       # Business logic
 │   │   ├── db/             # Database and repositories
-│   │   └── websocket/      # WebSocket handlers
-│   └── tests/              # Backend tests
+│   │   └── websocket/      # WebSocket server (Axum)
+│   ├── tests/              # Integration tests
+│   └── benches/            # Performance benchmarks
 │
 ├── shared/                 # Shared types (frontend + backend)
 ├── docs/                   # Documentation
-├── scripts/                # Deployment scripts
-├── e2e/                    # E2E tests (Playwright)
-└── ecosystem.config.js     # PM2 configuration
+└── e2e/                    # E2E tests (Playwright)
 ```
 
 ---
@@ -229,55 +162,14 @@ claude-manager/
 
 ---
 
-## Monitoring & Metrics
+## Documentation
 
-### Health Checks
-
-```bash
-# Comprehensive health check
-curl http://localhost:3001/api/health
-
-# Liveness probe
-curl http://localhost:3001/api/health/live
-
-# Readiness probe
-curl http://localhost:3001/api/health/ready
-```
-
-### Application Metrics
-
-```bash
-# JSON format
-curl http://localhost:3001/api/metrics
-
-# Prometheus format
-curl http://localhost:3001/api/metrics/prometheus
-```
-
-### Error Tracking
-
-```bash
-# Recent errors
-curl http://localhost:3001/api/errors
-
-# Error statistics
-curl http://localhost:3001/api/errors/stats
-```
-
----
-
-## Configuration
-
-Configuration is via environment variables. See [Configuration Reference](docs/configuration.md) for details.
-
-Key variables:
-
-```bash
-NODE_ENV=production       # Environment mode
-PORT=3001                 # Server port
-DATA_DIR=~/.claude-manager # Data directory
-LOG_LEVEL=info            # Log verbosity
-```
+| Document                                                | Description                  |
+| ------------------------------------------------------- | ---------------------------- |
+| [Architecture](docs/01-architecture-overview.md)        | System design and patterns   |
+| [API Specification](docs/02-api-specification.md)       | API and WebSocket events     |
+| [Database Schema](docs/03-database-schema.md)           | SQLite schema and migrations |
+| [Frontend Integration](docs/08-frontend-integration.md) | React Query and Tauri IPC    |
 
 ---
 
@@ -285,16 +177,11 @@ LOG_LEVEL=info            # Log verbosity
 
 1. Fork the repository
 2. Create a feature branch (`git checkout -b feature/amazing-feature`)
-3. Commit your changes (`git commit -m 'Add amazing feature'`)
-4. Push to the branch (`git push origin feature/amazing-feature`)
-5. Open a Pull Request
-
-### Development Guidelines
-
-- Write tests for new features
-- Follow existing code patterns
-- Update documentation as needed
-- Ensure CI passes before merging
+3. Write tests alongside code
+4. Run `cargo clippy` and `cargo fmt`
+5. Commit your changes (`git commit -m 'Add amazing feature'`)
+6. Push to the branch (`git push origin feature/amazing-feature`)
+7. Open a Pull Request
 
 ---
 

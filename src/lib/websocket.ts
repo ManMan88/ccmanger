@@ -4,16 +4,34 @@ import type { Agent, Message, AgentStatus } from '@claude-manager/shared'
 
 type MessageHandler = (data: unknown) => void
 
+// WebSocket message format - compatible with both Node.js and Rust backends
+// Rust backend uses tagged enums with inline fields (camelCase)
+// Node.js backend uses { type, payload } format
 interface WebSocketMessage {
   type: string
-  payload: unknown
+  payload?: unknown
+  // Rust backend fields (camelCase as per serde config)
+  agentId?: string
+  content?: string
+  isComplete?: boolean
+  status?: AgentStatus
+  contextLevel?: number
+  level?: number
+  error?: string
+  exitCode?: number
+  exit_code?: number
+  reason?: string
+  signal?: string
+  workspaceId?: string
+  event?: string
+  usage?: unknown
   timestamp?: string
 }
 
 interface AgentOutputPayload {
   agentId: string
   content: string
-  role: 'user' | 'assistant' | 'system' | 'tool'
+  role?: 'user' | 'assistant' | 'system' | 'tool'
   isComplete?: boolean
 }
 
@@ -24,7 +42,8 @@ interface AgentStatusPayload {
 
 interface AgentContextPayload {
   agentId: string
-  contextLevel: number
+  contextLevel?: number
+  level?: number
 }
 
 interface AgentErrorPayload {
@@ -35,20 +54,23 @@ interface AgentErrorPayload {
 
 interface AgentTerminatedPayload {
   agentId: string
-  exitCode: number
+  exitCode?: number
   reason?: string
+  signal?: string
 }
 
 interface WorkspaceUpdatedPayload {
   workspaceId: string
-  action: string
-  data: unknown
+  action?: string
+  event?: string
+  data?: unknown
 }
 
 interface UsageUpdatedPayload {
-  daily: { used: number; limit: number; resetTime: string }
-  weekly: { used: number; limit: number; resetTime: string }
-  sonnetOnly: { used: number; limit: number; resetTime: string }
+  daily?: { used: number; limit: number; resetTime: string }
+  weekly?: { used: number; limit: number; resetTime: string }
+  sonnetOnly?: { used: number; limit: number; resetTime: string }
+  usage?: unknown
 }
 
 type ConnectionStatus = 'connecting' | 'connected' | 'disconnected' | 'error'
@@ -133,6 +155,9 @@ class WebSocketClient {
   }
 
   private handleMessage(message: WebSocketMessage): void {
+    // Extract payload - Rust backend sends inline fields, Node.js uses { type, payload }
+    const payload = message.payload || message
+
     // Handle built-in message types
     switch (message.type) {
       case 'pong':
@@ -140,38 +165,93 @@ class WebSocketClient {
         break
 
       case 'agent:output':
-        this.handleAgentOutput(message.payload as AgentOutputPayload)
+        this.handleAgentOutput(this.extractAgentOutputPayload(payload))
         break
 
       case 'agent:status':
-        this.handleAgentStatus(message.payload as AgentStatusPayload)
+        this.handleAgentStatus(this.extractAgentStatusPayload(payload))
         break
 
       case 'agent:context':
-        this.handleAgentContext(message.payload as AgentContextPayload)
+        this.handleAgentContext(this.extractAgentContextPayload(payload))
         break
 
       case 'agent:error':
-        this.handleAgentError(message.payload as AgentErrorPayload)
+        this.handleAgentError(this.extractAgentErrorPayload(payload))
         break
 
       case 'agent:terminated':
-        this.handleAgentTerminated(message.payload as AgentTerminatedPayload)
+        this.handleAgentTerminated(this.extractAgentTerminatedPayload(payload))
         break
 
       case 'workspace:updated':
-        this.handleWorkspaceUpdate(message.payload as WorkspaceUpdatedPayload)
+        this.handleWorkspaceUpdate(this.extractWorkspaceUpdatedPayload(payload))
         break
 
       case 'usage:updated':
-        this.handleUsageUpdate(message.payload as UsageUpdatedPayload)
+        this.handleUsageUpdate(payload as UsageUpdatedPayload)
         break
     }
 
     // Notify registered handlers
     const handlers = this.handlers.get(message.type)
     if (handlers) {
-      handlers.forEach((handler) => handler(message.payload))
+      handlers.forEach((handler) => handler(payload))
+    }
+  }
+
+  // Extract payload from either format (Node.js or Rust backend)
+  private extractAgentOutputPayload(payload: unknown): AgentOutputPayload {
+    const p = payload as Record<string, unknown>
+    return {
+      agentId: (p.agentId as string) || '',
+      content: (p.content as string) || '',
+      role: p.role as 'user' | 'assistant' | 'system' | 'tool' | undefined,
+      isComplete: (p.isComplete as boolean) ?? true,
+    }
+  }
+
+  private extractAgentStatusPayload(payload: unknown): AgentStatusPayload {
+    const p = payload as Record<string, unknown>
+    return {
+      agentId: (p.agentId as string) || '',
+      status: (p.status as AgentStatus) || 'finished',
+    }
+  }
+
+  private extractAgentContextPayload(payload: unknown): AgentContextPayload {
+    const p = payload as Record<string, unknown>
+    return {
+      agentId: (p.agentId as string) || '',
+      contextLevel: (p.contextLevel as number) ?? (p.level as number) ?? 0,
+    }
+  }
+
+  private extractAgentErrorPayload(payload: unknown): AgentErrorPayload {
+    const p = payload as Record<string, unknown>
+    return {
+      agentId: (p.agentId as string) || '',
+      error: (p.error as string) || (p.message as string) || '',
+      code: p.code as string | undefined,
+    }
+  }
+
+  private extractAgentTerminatedPayload(payload: unknown): AgentTerminatedPayload {
+    const p = payload as Record<string, unknown>
+    return {
+      agentId: (p.agentId as string) || '',
+      exitCode: (p.exitCode as number) ?? (p.exit_code as number),
+      reason: p.reason as string | undefined,
+      signal: p.signal as string | undefined,
+    }
+  }
+
+  private extractWorkspaceUpdatedPayload(payload: unknown): WorkspaceUpdatedPayload {
+    const p = payload as Record<string, unknown>
+    return {
+      workspaceId: (p.workspaceId as string) || '',
+      action: (p.action as string) || (p.event as string),
+      data: p.data,
     }
   }
 
@@ -185,7 +265,7 @@ class WebSocketClient {
       const newMessage: Message = {
         id: `msg_${Date.now()}`,
         agentId: payload.agentId,
-        role: payload.role,
+        role: payload.role || 'assistant',
         content: payload.content,
         tokenCount: null,
         toolName: null,
@@ -230,8 +310,10 @@ class WebSocketClient {
   }
 
   private handleAgentContext(payload: AgentContextPayload): void {
+    const contextLevel = payload.contextLevel ?? 0
+
     queryClient.setQueryData<Agent>(queryKeys.agents.detail(payload.agentId), (old) =>
-      old ? { ...old, contextLevel: payload.contextLevel } : old
+      old ? { ...old, contextLevel } : old
     )
 
     // Also update in worktree agents list
@@ -243,7 +325,7 @@ class WebSocketClient {
           old
             ? {
                 agents: old.agents.map((a) =>
-                  a.id === payload.agentId ? { ...a, contextLevel: payload.contextLevel } : a
+                  a.id === payload.agentId ? { ...a, contextLevel } : a
                 ),
               }
             : old
@@ -280,7 +362,9 @@ class WebSocketClient {
   }
 
   private handleUsageUpdate(payload: UsageUpdatedPayload): void {
-    queryClient.setQueryData(queryKeys.usage.current, payload)
+    // Handle both formats - Rust sends { usage }, Node.js sends directly
+    const usageData = payload.usage || payload
+    queryClient.setQueryData(queryKeys.usage.current, usageData)
   }
 
   // Subscription methods
