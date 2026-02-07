@@ -638,22 +638,31 @@ export const api = {
 
 // Dialog utilities
 export async function openDirectoryPicker(): Promise<string | null> {
-  if (!isTauri) {
+  // Check at call time, not module load time
+  const tauriAvailable = typeof window !== 'undefined' && '__TAURI__' in window
+  if (!tauriAvailable) {
     // Fallback for non-Tauri environments
     return prompt('Enter the path to a Git repository:')
   }
-  const { open } = await import('@tauri-apps/plugin-dialog')
-  const { homeDir } = await import('@tauri-apps/api/path')
 
-  const home = await homeDir()
-  const selected = await open({
-    directory: true,
-    multiple: false,
-    defaultPath: home,
-    title: 'Select Git Repository',
-  })
+  try {
+    const { open } = await import('@tauri-apps/plugin-dialog')
+    const { homeDir } = await import('@tauri-apps/api/path')
 
-  return selected as string | null
+    const home = await homeDir()
+    const selected = await open({
+      directory: true,
+      multiple: false,
+      defaultPath: home,
+      title: 'Select Git Repository',
+    })
+
+    return selected as string | null
+  } catch (error) {
+    console.error('Failed to open directory picker:', error)
+    // Fallback if dialog fails
+    return prompt('Enter the path to a Git repository:')
+  }
 }
 
 // Export isTauri check for other modules
