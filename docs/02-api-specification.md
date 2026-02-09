@@ -626,15 +626,35 @@ Get usage history.
 
 ## WebSocket API
 
-### Connection
+### Control WebSocket
 
 ```javascript
 const ws = new WebSocket('ws://localhost:3001/ws')
 ```
 
-### Message Format
+Used for JSON-based control events (status changes, context updates, errors, termination).
 
-All WebSocket messages follow this format:
+### PTY WebSocket (Terminal I/O)
+
+```javascript
+const ws = new WebSocket('ws://localhost:3001/ws/pty/{agentId}')
+ws.binaryType = 'arraybuffer'
+```
+
+Dedicated binary WebSocket for streaming raw PTY I/O to/from xterm.js. On connect, buffered output is replayed so the terminal state is preserved across modal close/reopen.
+
+**Client → Server:**
+
+- Binary frames: raw terminal input (keystrokes)
+- Text frames: JSON resize messages `{"type":"resize","rows":24,"cols":120}`
+
+**Server → Client:**
+
+- Binary frames: raw PTY output (ANSI escape sequences, colors, cursor movement)
+
+### Control Message Format
+
+All control WebSocket messages follow this format:
 
 ```json
 {

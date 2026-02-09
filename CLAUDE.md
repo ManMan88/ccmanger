@@ -21,6 +21,7 @@ Claude Manager provides a visual interface to:
 - **Styling**: Tailwind CSS 3.4 + shadcn/ui (Radix primitives)
 - **State**: React Query (TanStack Query) for server state
 - **Real-time**: WebSocket client with auto-reconnect
+- **Terminal**: xterm.js (@xterm/xterm + @xterm/addon-fit) for interactive CLI
 - **Forms**: React Hook Form + Zod validation
 - **Icons**: Lucide React
 
@@ -46,6 +47,7 @@ claude-manager/
 │   │   ├── WorktreeRow.tsx        # Worktree container with agents
 │   │   ├── AgentBox.tsx           # Individual agent card
 │   │   ├── AgentModal.tsx         # Agent interaction dialog
+│   │   ├── XtermTerminal.tsx      # xterm.js terminal emulator component
 │   │   └── ui/                    # shadcn/ui components (40+)
 │   ├── hooks/
 │   │   ├── useWorkspace.ts        # Workspace state with React Query
@@ -138,14 +140,21 @@ pnpm lint                 # ESLint check
 │  │  └─────────────┘ └─────────────┘ └─────────────┘       │  │
 │  │                        │                                 │  │
 │  │  ┌─────────────────────────────────────────────────┐   │  │
-│  │  │     Process Manager (tokio::process)             │   │  │
+│  │  │  Process Manager (portable-pty, raw byte I/O)    │   │  │
 │  │  └─────────────────────────────────────────────────┘   │  │
 │  └─────────────────────────────────────────────────────────┘  │
 └───────────────────────────────────────────────────────────────┘
+              │ /ws (control)        │ /ws/pty/:id (binary)
+              ▼                      ▼
+       ┌─────────────┐      ┌──────────────────┐
+       │ React Query │      │ xterm.js         │
+       │ (status/ctx)│      │ (terminal I/O)   │
+       └─────────────┘      └──────────────────┘
                                 │
                                 ▼
                        ┌─────────────────┐
                        │ Claude Code CLI │
+                       │ (interactive)   │
                        └─────────────────┘
 ```
 

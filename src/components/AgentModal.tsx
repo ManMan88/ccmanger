@@ -1,8 +1,8 @@
-import { useState, useEffect, useRef } from 'react'
+import { useState } from 'react'
 import type { Agent, AgentMode } from '@claude-manager/shared'
 import { useAgent } from '@/hooks/useAgents'
 import { useAgentSubscription, useWebSocket } from '@/hooks/useWebSocket'
-import { useTerminalOutput } from '@/hooks/useTerminalOutput'
+import { XtermTerminal } from '@/components/XtermTerminal'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
@@ -40,22 +40,11 @@ export function AgentModal({
   onUpdateAgent,
   onSelectAgent,
 }: AgentModalProps) {
-  const [input, setInput] = useState('')
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null)
   const [editedName, setEditedName] = useState('')
-  const terminalRef = useRef<HTMLDivElement>(null)
 
   // Get agent data and actions from API
-  const {
-    agent: agentData,
-    sendMessage,
-    stopAgent,
-    startAgent,
-    isSending,
-  } = useAgent(open ? selectedAgentId : null)
-
-  // Terminal output hook
-  const { lines, addUserInput } = useTerminalOutput(open ? selectedAgentId : null)
+  const { agent: agentData, stopAgent, startAgent } = useAgent(open ? selectedAgentId : null)
 
   // Subscribe to agent updates via WebSocket
   useAgentSubscription(open ? selectedAgentId : null)
@@ -66,34 +55,9 @@ export function AgentModal({
   // Find the agent from props (for display purposes before API data loads)
   const currentAgent = agentData || agents.find((a) => a.id === selectedAgentId)
 
-  // Auto-scroll to bottom when new output arrives
-  useEffect(() => {
-    if (terminalRef.current) {
-      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
-    }
-  }, [lines])
-
   if (!currentAgent || agents.length === 0) return null
 
   const ModeIcon = modeIcons[currentAgent.mode]
-
-  const handleSend = () => {
-    if (!input.trim() || !currentAgent) return
-
-    const message = input.trim()
-    setInput('')
-
-    // Echo user input in terminal
-    addUserInput(message)
-
-    if (currentAgent.status === 'finished' || currentAgent.status === 'error') {
-      // Agent is idle — start it with the input as initial prompt
-      startAgent(message)
-    } else {
-      // Agent is running/waiting — write to stdin
-      sendMessage(message)
-    }
-  }
 
   const handleStartEditing = (agent: Agent) => {
     setEditedName(agent.name)
@@ -188,7 +152,7 @@ export function AgentModal({
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => startAgent('continue')}
+                  onClick={() => startAgent()}
                   className="gap-1.5"
                 >
                   <Play className="h-3.5 w-3.5" />
@@ -208,56 +172,16 @@ export function AgentModal({
           </div>
         </DialogHeader>
 
-        {/* Terminal Output */}
-        <div
-          ref={terminalRef}
-          className="flex-1 overflow-y-auto bg-[#300a24] p-4 font-mono text-sm leading-relaxed"
-          data-testid="terminal-output"
-        >
-          {lines.length === 0 ? (
-            <div className="text-gray-500">
-              <p>Ready. Type a message below to start the agent.</p>
-            </div>
-          ) : (
-            lines.map((line) => (
-              <div
-                key={line.id}
-                className={
-                  line.type === 'user-input'
-                    ? 'text-green-400'
-                    : line.type === 'stderr'
-                      ? 'text-red-400'
-                      : line.type === 'system'
-                        ? 'italic text-yellow-500'
-                        : 'text-gray-200'
-                }
-              >
-                {line.type === 'user-input' ? `$ ${line.content}` : line.content}
-              </div>
-            ))
-          )}
-        </div>
-
-        {/* Terminal Input */}
-        <div className="flex-shrink-0 border-t border-border bg-[#300a24] px-4 py-3">
-          <div className="flex items-center gap-2 font-mono">
-            <span className="select-none text-green-400">$</span>
-            <input
-              type="text"
-              value={input}
-              onChange={(e) => setInput(e.target.value)}
-              placeholder="Type a message..."
-              className="flex-1 border-none bg-transparent text-sm text-gray-200 outline-none placeholder:text-gray-600"
-              disabled={isSending}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  e.preventDefault()
-                  handleSend()
-                }
-              }}
-              data-testid="message-input"
+        {/* Terminal - xterm.js */}
+        <div className="flex-1 overflow-hidden bg-[#300a24]" data-testid="terminal-output">
+          {currentAgent ? (
+            <XtermTerminal
+              agentId={currentAgent.id}
+              isRunning={currentAgent.status === 'running'}
             />
-          </div>
+          ) : (
+            <div className="p-4 text-gray-500">Select an agent to begin.</div>
+          )}
         </div>
       </DialogContent>
     </Dialog>

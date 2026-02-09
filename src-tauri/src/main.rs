@@ -74,8 +74,9 @@ fn main() {
 
             // Start WebSocket server in background
             let ws_rx = process_manager.subscribe();
+            let ws_pm = process_manager.clone();
             tauri::async_runtime::spawn(async move {
-                if let Err(e) = services::start_websocket_server(ws_rx).await {
+                if let Err(e) = services::start_websocket_server(ws_rx, ws_pm).await {
                     tracing::error!("WebSocket server error: {}", e);
                 }
             });

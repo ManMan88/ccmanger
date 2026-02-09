@@ -1,12 +1,17 @@
 //! Process manager for Claude CLI agents
+//!
+//! Uses a pseudo-terminal (PTY) to spawn Claude CLI so that Node.js sees a TTY
+//! and uses line-buffered output, enabling real-time streaming to the terminal UI.
+//! Raw byte output is streamed through per-agent mpsc channels to a dedicated
+//! PTY WebSocket endpoint, which feeds xterm.js on the frontend.
 
-use parking_lot::RwLock;
+use parking_lot::Mutex;
+use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::collections::HashMap;
-use std::io::{BufRead, BufReader, Write};
-use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
+use std::io::{Read, Write};
 use std::sync::Arc;
 use thiserror::Error;
-use tokio::sync::broadcast;
+use tokio::sync::{broadcast, mpsc};
 
 use crate::types::{AgentMode, AgentStatus, Permission};
 
@@ -50,15 +55,26 @@ pub enum ProcessEvent {
     },
 }
 
-/// Represents a running agent process
+/// Per-agent PTY I/O channel for WebSocket bridging
+struct PtyChannel {
+    input_tx: mpsc::UnboundedSender<Vec<u8>>,
+}
+
+/// Represents a running agent process (PTY-backed)
 struct AgentProcess {
     pid: u32,
-    child: Child,
+    child: Box<dyn portable_pty::Child + Send>,
+    pty_master: Box<dyn portable_pty::MasterPty + Send>,
 }
 
 /// Manages Claude CLI agent processes
 pub struct ProcessManager {
-    processes: Arc<RwLock<HashMap<String, AgentProcess>>>,
+    processes: Arc<Mutex<HashMap<String, AgentProcess>>>,
+    pty_channels: Arc<Mutex<HashMap<String, PtyChannel>>>,
+    /// Per-agent raw byte buffer for replaying output on WebSocket reconnect
+    pty_buffers: Arc<Mutex<HashMap<String, Vec<u8>>>>,
+    /// Per-agent output receiver — taken by the first WebSocket connection
+    pty_output_rxs: Arc<Mutex<HashMap<String, mpsc::UnboundedReceiver<Vec<u8>>>>>,
     event_tx: broadcast::Sender<ProcessEvent>,
     claude_cli_path: String,
 }
@@ -67,7 +83,10 @@ impl ProcessManager {
     pub fn new(claude_cli_path: String) -> Self {
         let (event_tx, _) = broadcast::channel(1000);
         Self {
-            processes: Arc::new(RwLock::new(HashMap::new())),
+            processes: Arc::new(Mutex::new(HashMap::new())),
+            pty_channels: Arc::new(Mutex::new(HashMap::new())),
+            pty_buffers: Arc::new(Mutex::new(HashMap::new())),
+            pty_output_rxs: Arc::new(Mutex::new(HashMap::new())),
             event_tx,
             claude_cli_path,
         }
@@ -85,15 +104,15 @@ impl ProcessManager {
         worktree_path: &str,
         mode: AgentMode,
         permissions: &[Permission],
-        initial_prompt: Option<&str>,
+        _initial_prompt: Option<&str>,
         session_id: Option<&str>,
     ) -> Result<u32, ProcessError> {
         // Check if already running
-        if self.processes.read().contains_key(agent_id) {
+        if self.processes.lock().contains_key(agent_id) {
             return Err(ProcessError::AlreadyRunning(agent_id.to_string()));
         }
 
-        // Build command arguments
+        // Build command arguments — interactive mode (no --print)
         let mut args = vec!["--verbose".to_string()];
 
         // Mode-specific flags
@@ -127,41 +146,80 @@ impl ProcessManager {
             args.push(sid.to_string());
         }
 
-        // Initial prompt
-        if let Some(prompt) = initial_prompt {
-            args.push("--print".to_string());
-            args.push(prompt.to_string());
-        }
+        // No --print flag — always run interactively
 
-        // Spawn process
-        let mut child = Command::new(&self.claude_cli_path)
-            .args(&args)
-            .current_dir(worktree_path)
-            .stdin(Stdio::piped())
-            .stdout(Stdio::piped())
-            .stderr(Stdio::piped())
-            .env("FORCE_COLOR", "0")
-            .env("NO_COLOR", "1")
-            .spawn()
+        // Create PTY pair
+        let pty_system = native_pty_system();
+        let pair = pty_system
+            .openpty(PtySize {
+                rows: 24,
+                cols: 120,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
             .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
 
-        let pid = child.id();
+        // Build command for PTY — full color support for xterm.js
+        let mut cmd = CommandBuilder::new(&self.claude_cli_path);
+        cmd.args(&args);
+        cmd.cwd(worktree_path);
+        cmd.env("TERM", "xterm-256color");
 
-        // Take stdout/stderr before inserting child into map
-        let stdout = child.stdout.take();
-        let stderr = child.stderr.take();
+        // Spawn in PTY
+        let child = pair
+            .slave
+            .spawn_command(cmd)
+            .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
+        let pid = child.process_id().unwrap_or(0);
+
+        // Get reader/writer from PTY master
+        let reader = pair
+            .master
+            .try_clone_reader()
+            .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
+        let writer = pair
+            .master
+            .take_writer()
+            .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
+
+        // Drop slave — not needed after spawn
+        drop(pair.slave);
+
+        // Create mpsc channels for PTY I/O
+        let (output_tx, output_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+        let (input_tx, input_rx) = mpsc::unbounded_channel::<Vec<u8>>();
+
+        let channel = PtyChannel {
+            input_tx: input_tx.clone(),
+        };
 
         let process = AgentProcess {
             pid,
             child,
+            pty_master: pair.master,
         };
 
         self.processes
-            .write()
+            .lock()
             .insert(agent_id.to_string(), process);
+        self.pty_channels
+            .lock()
+            .insert(agent_id.to_string(), channel);
+        self.pty_buffers
+            .lock()
+            .insert(agent_id.to_string(), Vec::new());
+        self.pty_output_rxs
+            .lock()
+            .insert(agent_id.to_string(), output_rx);
 
-        // Start output monitoring in background
-        self.start_output_monitor(agent_id.to_string(), stdout, stderr);
+        // Start raw byte output reader
+        self.start_output_reader(agent_id.to_string(), reader, output_tx);
+
+        // Start PTY writer task
+        self.start_input_writer(agent_id.to_string(), writer, input_rx);
+
+        // Start exit poller
+        self.start_exit_poller(agent_id.to_string());
 
         // Emit running status
         let _ = self.event_tx.send(ProcessEvent::Status {
@@ -173,32 +231,41 @@ impl ProcessManager {
         Ok(pid)
     }
 
-    /// Send a message to an agent's stdin
+    /// Send a message to an agent via the PTY input channel
     pub fn send_message(&self, agent_id: &str, content: &str) -> Result<(), ProcessError> {
-        let mut processes = self.processes.write();
-        let process = processes
-            .get_mut(agent_id)
+        let channels = self.pty_channels.lock();
+        let channel = channels
+            .get(agent_id)
             .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
-
-        if let Some(stdin) = process.child.stdin.as_mut() {
-            writeln!(stdin, "{}", content)?;
-            stdin.flush()?;
-        }
-
+        channel
+            .input_tx
+            .send(format!("{}\n", content).into_bytes())
+            .map_err(|_| {
+                ProcessError::Io(std::io::Error::new(
+                    std::io::ErrorKind::BrokenPipe,
+                    "PTY closed",
+                ))
+            })?;
         Ok(())
     }
 
     /// Stop an agent process
     pub fn stop_agent(&self, agent_id: &str, force: bool) -> Result<(), ProcessError> {
-        let mut processes = self.processes.write();
+        let mut processes = self.processes.lock();
         let process = processes
             .get_mut(agent_id)
             .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
 
         if force {
-            process.child.kill()?;
+            process
+                .child
+                .kill()
+                .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
             // For force stop, remove immediately and emit exit event
             processes.remove(agent_id);
+            self.pty_channels.lock().remove(agent_id);
+            self.pty_output_rxs.lock().remove(agent_id);
+            // Keep pty_buffers for replay on reconnect
             let _ = self.event_tx.send(ProcessEvent::Exit {
                 agent_id: agent_id.to_string(),
                 code: None,
@@ -214,9 +281,12 @@ impl ProcessManager {
             }
             #[cfg(not(unix))]
             {
-                process.child.kill()?;
+                process
+                    .child
+                    .kill()
+                    .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
             }
-            // Do NOT remove from map or emit exit event — the output monitor will handle it
+            // Do NOT remove from map or emit exit event — the exit poller will handle it
         }
 
         Ok(())
@@ -224,17 +294,17 @@ impl ProcessManager {
 
     /// Check if an agent is currently running
     pub fn is_running(&self, agent_id: &str) -> bool {
-        self.processes.read().contains_key(agent_id)
+        self.processes.lock().contains_key(agent_id)
     }
 
     /// Get count of running agents
     pub fn get_running_count(&self) -> usize {
-        self.processes.read().len()
+        self.processes.lock().len()
     }
 
     /// Stop all running agents
     pub fn stop_all(&self) {
-        let mut processes = self.processes.write();
+        let mut processes = self.processes.lock();
         for (agent_id, mut process) in processes.drain() {
             let _ = process.child.kill();
             let _ = self.event_tx.send(ProcessEvent::Exit {
@@ -243,80 +313,139 @@ impl ProcessManager {
                 signal: Some("SIGKILL".to_string()),
             });
         }
+        self.pty_channels.lock().clear();
+        self.pty_output_rxs.lock().clear();
     }
 
-    /// Start monitoring output from an agent process
-    fn start_output_monitor(
+    /// Take the PTY output receiver for a WebSocket connection (consumes it).
+    /// Returns the receiver and any buffered output for replay.
+    pub fn take_pty_output_rx(
+        &self,
+        agent_id: &str,
+    ) -> Option<(mpsc::UnboundedReceiver<Vec<u8>>, Vec<u8>)> {
+        let rx = self.pty_output_rxs.lock().remove(agent_id)?;
+        let buffer = self
+            .pty_buffers
+            .lock()
+            .get(agent_id)
+            .cloned()
+            .unwrap_or_default();
+        Some((rx, buffer))
+    }
+
+    /// Get a cloneable PTY input sender for an agent
+    pub fn get_pty_input_tx(&self, agent_id: &str) -> Option<mpsc::UnboundedSender<Vec<u8>>> {
+        self.pty_channels
+            .lock()
+            .get(agent_id)
+            .map(|ch| ch.input_tx.clone())
+    }
+
+    /// Resize PTY for an agent
+    pub fn resize_pty(&self, agent_id: &str, rows: u16, cols: u16) -> Result<(), ProcessError> {
+        let processes = self.processes.lock();
+        let process = processes
+            .get(agent_id)
+            .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
+        process
+            .pty_master
+            .resize(PtySize {
+                rows,
+                cols,
+                pixel_width: 0,
+                pixel_height: 0,
+            })
+            .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
+        Ok(())
+    }
+
+    /// Start raw byte reader from PTY → output channel + buffer
+    fn start_output_reader(
         &self,
         agent_id: String,
-        stdout: Option<ChildStdout>,
-        stderr: Option<ChildStderr>,
+        mut reader: Box<dyn Read + Send>,
+        output_tx: mpsc::UnboundedSender<Vec<u8>>,
     ) {
+        let buffers = self.pty_buffers.clone();
+
+        tokio::task::spawn_blocking(move || {
+            let mut buf = [0u8; 4096];
+            loop {
+                match reader.read(&mut buf) {
+                    Ok(0) => break,
+                    Ok(n) => {
+                        let chunk = buf[..n].to_vec();
+                        // Append to replay buffer
+                        if let Some(buffer) = buffers.lock().get_mut(&agent_id) {
+                            buffer.extend_from_slice(&chunk);
+                        }
+                        // Send to WebSocket (ignore error if no receiver yet)
+                        if output_tx.send(chunk).is_err() {
+                            break;
+                        }
+                    }
+                    Err(e) => {
+                        tracing::debug!("Agent {} PTY reader ended: {}", agent_id, e);
+                        break;
+                    }
+                }
+            }
+        });
+    }
+
+    /// Start PTY writer task: reads from input channel → writes to PTY
+    fn start_input_writer(
+        &self,
+        agent_id: String,
+        mut writer: Box<dyn Write + Send>,
+        mut input_rx: mpsc::UnboundedReceiver<Vec<u8>>,
+    ) {
+        tokio::task::spawn_blocking(move || {
+            while let Some(data) = input_rx.blocking_recv() {
+                if writer.write_all(&data).is_err() {
+                    break;
+                }
+                if writer.flush().is_err() {
+                    break;
+                }
+            }
+            tracing::debug!("Agent {} PTY writer ended", agent_id);
+        });
+    }
+
+    /// Start exit poller — checks if the child process has exited
+    fn start_exit_poller(&self, agent_id: String) {
         let processes = self.processes.clone();
+        let pty_channels = self.pty_channels.clone();
+        let pty_output_rxs = self.pty_output_rxs.clone();
         let event_tx = self.event_tx.clone();
 
-        // Stdout reader task
-        if let Some(stdout) = stdout {
-            let agent_id = agent_id.clone();
-            let event_tx = event_tx.clone();
-            tokio::task::spawn_blocking(move || {
-                let reader = BufReader::new(stdout);
-                for line in reader.lines() {
-                    match line {
-                        Ok(content) => {
-                            let _ = event_tx.send(ProcessEvent::Output {
-                                agent_id: agent_id.clone(),
-                                content,
-                                is_complete: true,
-                            });
-                        }
-                        Err(_) => break,
-                    }
-                }
-            });
-        }
-
-        // Stderr reader task
-        if let Some(stderr) = stderr {
-            let agent_id = agent_id.clone();
-            let event_tx = event_tx.clone();
-            tokio::task::spawn_blocking(move || {
-                let reader = BufReader::new(stderr);
-                for line in reader.lines() {
-                    match line {
-                        Ok(content) => {
-                            let _ = event_tx.send(ProcessEvent::Error {
-                                agent_id: agent_id.clone(),
-                                message: content,
-                            });
-                        }
-                        Err(_) => break,
-                    }
-                }
-            });
-        }
-
-        // Exit poller task
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
                 let should_exit = {
-                    let mut procs = processes.write();
+                    let mut procs = processes.lock();
                     if let Some(process) = procs.get_mut(&agent_id) {
                         match process.child.try_wait() {
                             Ok(Some(status)) => {
+                                let exit_code = if status.success() { Some(0) } else { None };
                                 let _ = event_tx.send(ProcessEvent::Exit {
                                     agent_id: agent_id.clone(),
-                                    code: status.code(),
+                                    code: exit_code,
                                     signal: None,
                                 });
                                 procs.remove(&agent_id);
+                                pty_channels.lock().remove(&agent_id);
+                                pty_output_rxs.lock().remove(&agent_id);
+                                // Keep pty_buffers for replay
                                 true
                             }
                             Ok(None) => false,
                             Err(_) => {
                                 procs.remove(&agent_id);
+                                pty_channels.lock().remove(&agent_id);
+                                pty_output_rxs.lock().remove(&agent_id);
                                 true
                             }
                         }

@@ -3,7 +3,7 @@
 use axum::{
     extract::{
         ws::{Message, WebSocket, WebSocketUpgrade},
-        State,
+        Path, State,
     },
     response::IntoResponse,
     routing::get,
@@ -16,6 +16,7 @@ use std::collections::{HashMap, HashSet};
 use std::sync::Arc;
 use tokio::sync::broadcast;
 
+use crate::services::process_service::ProcessManager;
 use crate::services::ProcessEvent;
 use crate::types::{
     AgentContextPayload, AgentErrorPayload, AgentOutputPayload, AgentStatusPayload,
@@ -99,15 +100,18 @@ impl ClientManager {
 /// WebSocket server state
 struct WsState {
     client_manager: Arc<ClientManager>,
+    process_manager: Arc<ProcessManager>,
 }
 
 /// Start the WebSocket server
 pub async fn start_websocket_server(
     mut process_rx: broadcast::Receiver<ProcessEvent>,
+    process_manager: Arc<ProcessManager>,
 ) -> Result<(), std::io::Error> {
     let client_manager = Arc::new(ClientManager::new());
     let state = Arc::new(WsState {
         client_manager: client_manager.clone(),
+        process_manager,
     });
 
     // Spawn task to broadcast process events
@@ -185,6 +189,7 @@ pub async fn start_websocket_server(
 
     let app = Router::new()
         .route("/ws", get(ws_handler))
+        .route("/ws/pty/:agent_id", get(pty_ws_handler))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3001").await?;
@@ -251,5 +256,101 @@ async fn handle_socket(socket: WebSocket, state: Arc<WsState>) {
 
     // Cleanup
     state.client_manager.remove_client(&client_id);
+    send_task.abort();
+}
+
+// --- PTY WebSocket endpoint ---
+
+/// JSON message for PTY resize
+#[derive(serde::Deserialize)]
+struct ResizeMsg {
+    #[serde(rename = "type")]
+    _type: String,
+    rows: u16,
+    cols: u16,
+}
+
+async fn pty_ws_handler(
+    ws: WebSocketUpgrade,
+    Path(agent_id): Path<String>,
+    State(state): State<Arc<WsState>>,
+) -> impl IntoResponse {
+    ws.on_upgrade(move |socket| handle_pty_socket(socket, agent_id, state))
+}
+
+async fn handle_pty_socket(socket: WebSocket, agent_id: String, state: Arc<WsState>) {
+    let (mut ws_sender, mut ws_receiver) = socket.split();
+
+    // Get PTY channels from ProcessManager
+    let pty_data = state.process_manager.take_pty_output_rx(&agent_id);
+    let input_tx = state.process_manager.get_pty_input_tx(&agent_id);
+
+    let (mut output_rx, buffer) = match pty_data {
+        Some(data) => data,
+        None => {
+            tracing::warn!("PTY WebSocket: no output channel for agent {}", agent_id);
+            let _ = ws_sender.close().await;
+            return;
+        }
+    };
+
+    let input_tx = match input_tx {
+        Some(tx) => tx,
+        None => {
+            tracing::warn!("PTY WebSocket: no input channel for agent {}", agent_id);
+            let _ = ws_sender.close().await;
+            return;
+        }
+    };
+
+    // Replay buffered output first
+    if !buffer.is_empty() {
+        // Send in chunks to avoid exceeding WebSocket frame limits
+        for chunk in buffer.chunks(4096) {
+            if ws_sender
+                .send(Message::Binary(chunk.to_vec()))
+                .await
+                .is_err()
+            {
+                return;
+            }
+        }
+    }
+
+    // Task: PTY output → WebSocket binary frames
+    let send_task = tokio::spawn(async move {
+        while let Some(bytes) = output_rx.recv().await {
+            if ws_sender
+                .send(Message::Binary(bytes))
+                .await
+                .is_err()
+            {
+                break;
+            }
+        }
+    });
+
+    // Task: WebSocket → PTY input (text or binary frames)
+    // Also handle JSON resize messages: {"type":"resize","rows":N,"cols":N}
+    let pm = state.process_manager.clone();
+    let agent_id_clone = agent_id.clone();
+    while let Some(Ok(msg)) = ws_receiver.next().await {
+        match msg {
+            Message::Binary(data) => {
+                let _ = input_tx.send(data.to_vec());
+            }
+            Message::Text(text) => {
+                // Check for resize JSON, otherwise treat as terminal input
+                if let Ok(resize) = serde_json::from_str::<ResizeMsg>(&text) {
+                    let _ = pm.resize_pty(&agent_id_clone, resize.rows, resize.cols);
+                } else {
+                    let _ = input_tx.send(text.into_bytes());
+                }
+            }
+            Message::Close(_) => break,
+            _ => {}
+        }
+    }
+
     send_task.abort();
 }

@@ -1037,74 +1037,57 @@ export function useAgentSubscription(agentId: string | null) {
 
 ### AgentModal Updates
 
-The agent modal now uses a terminal-style interface instead of chat bubbles. Output streams
-in real-time on a dark background with monospace font. The input is always enabled regardless
-of agent status — when idle, typing a message starts the agent with that prompt.
+The agent modal embeds a full **xterm.js** terminal emulator connected to the PTY via a dedicated
+binary WebSocket (`/ws/pty/:agentId`). Claude CLI runs in **interactive mode** (no `--print` flag)
+with `TERM=xterm-256color`, providing full ANSI colors, spinners, keyboard shortcuts (Ctrl+C, Tab,
+Escape), and the complete Claude CLI UI.
+
+All terminal input (keystrokes) goes through xterm.js → WebSocket → PTY. There is no separate
+text input box. The `useTerminalOutput` hook is no longer used in this component.
 
 ```typescript
 // src/components/AgentModal.tsx (key changes)
 import { useAgent } from '@/hooks/useAgents'
 import { useAgentSubscription, useWebSocket } from '@/hooks/useWebSocket'
-import { useTerminalOutput } from '@/hooks/useTerminalOutput'
+import { XtermTerminal } from '@/components/XtermTerminal'
 
-export function AgentModal({ agentId, open, onClose }: AgentModalProps) {
-  const { agent, sendMessage, startAgent, stopAgent, isSending } = useAgent(agentId)
+export function AgentModal({ agents, selectedAgentId, open, onClose, ... }: AgentModalProps) {
+  const { agent, stopAgent, startAgent } = useAgent(open ? selectedAgentId : null)
+  useAgentSubscription(open ? selectedAgentId : null)
   const { isConnected } = useWebSocket()
-  const { lines, addUserInput } = useTerminalOutput(open ? agentId : null)
-
-  // Subscribe to agent updates when modal is open
-  useAgentSubscription(open ? agentId : null)
-
-  const handleSend = (content: string) => {
-    if (!content.trim() || !agent) return
-    addUserInput(content)
-    if (agent.status === 'finished' || agent.status === 'error') {
-      startAgent(content) // Start agent with input as initial prompt
-    } else {
-      sendMessage(content) // Write to stdin
-    }
-  }
+  const currentAgent = agent || agents.find(a => a.id === selectedAgentId)
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
-        {/* Terminal output area */}
-        <div className="flex-1 overflow-y-auto bg-[#300a24] p-4 font-mono text-sm">
-          {lines.map((line) => (
-            <div key={line.id} className={
-              line.type === 'user-input' ? 'text-green-400' :
-              line.type === 'stderr' ? 'text-red-400' :
-              line.type === 'system' ? 'text-yellow-500 italic' :
-              'text-gray-200'
-            }>
-              {line.type === 'user-input' ? `$ ${line.content}` : line.content}
-            </div>
-          ))}
-        </div>
+        {/* Agent header with Start/Stop buttons */}
+        {/* ... */}
 
-        {/* Terminal-style input — always enabled */}
-        <div className="bg-[#300a24] px-4 py-3 font-mono">
-          <div className="flex items-center gap-2">
-            <span className="text-green-400">$</span>
-            <input
-              type="text"
-              placeholder="Type a message..."
-              className="flex-1 bg-transparent text-gray-200 outline-none"
-              disabled={isSending}
-              onKeyDown={(e) => {
-                if (e.key === 'Enter') {
-                  handleSend(e.currentTarget.value)
-                  e.currentTarget.value = ''
-                }
-              }}
+        {/* Terminal - xterm.js (replaces custom div + text input) */}
+        <div className="flex-1 overflow-hidden bg-[#300a24]">
+          {currentAgent && (
+            <XtermTerminal
+              agentId={currentAgent.id}
+              isRunning={currentAgent.status === 'running'}
             />
-          </div>
+          )}
         </div>
       </DialogContent>
     </Dialog>
   )
 }
 ```
+
+### XtermTerminal Component
+
+New component at `src/components/XtermTerminal.tsx` that:
+
+- Creates an xterm.js `Terminal` with `FitAddon` and `ResizeObserver`
+- Connects to `ws://127.0.0.1:3001/ws/pty/{agentId}` when the agent is running
+- Sends keystrokes as binary WebSocket frames
+- Sends resize events as JSON `{"type":"resize","rows":N,"cols":N}`
+- Receives raw PTY output (including buffered replay) and renders via `terminal.write()`
+- Terminal instance persists across agent start/stop (only WebSocket reconnects)
 
 ### Index Page Updates
 
