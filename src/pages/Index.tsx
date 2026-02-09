@@ -60,6 +60,7 @@ const Index = () => {
   const [addWorktreeOpen, setAddWorktreeOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draggedWorktreeId, setDraggedWorktreeId] = useState<string | null>(null)
+  const [dragOrder, setDragOrder] = useState<string[] | null>(null)
 
   // Auto-select first workspace if none selected
   useEffect(() => {
@@ -86,27 +87,43 @@ const Index = () => {
 
   const handleWorktreeDragStart = (worktreeId: string) => {
     setDraggedWorktreeId(worktreeId)
+    if (workspace) {
+      setDragOrder(workspace.worktrees.map((wt) => wt.id))
+    }
   }
 
   const handleWorktreeDragOver = (e: React.DragEvent, targetWorktreeId: string) => {
     e.preventDefault()
-    if (!draggedWorktreeId || draggedWorktreeId === targetWorktreeId || !workspace) return
+    if (!draggedWorktreeId || draggedWorktreeId === targetWorktreeId || !dragOrder) return
 
-    const currentOrder = workspace.worktrees.map((wt) => wt.id)
-    const draggedIndex = currentOrder.indexOf(draggedWorktreeId)
-    const targetIndex = currentOrder.indexOf(targetWorktreeId)
+    const draggedIndex = dragOrder.indexOf(draggedWorktreeId)
+    const targetIndex = dragOrder.indexOf(targetWorktreeId)
 
     if (draggedIndex === -1 || targetIndex === -1) return
 
-    const newOrder = [...currentOrder]
+    const newOrder = [...dragOrder]
     newOrder.splice(draggedIndex, 1)
     newOrder.splice(targetIndex, 0, draggedWorktreeId)
 
-    reorderWorktrees(newOrder)
+    setDragOrder(newOrder)
   }
 
   const handleWorktreeDragEnd = () => {
     setDraggedWorktreeId(null)
+    if (dragOrder && workspace) {
+      const originalOrder = workspace.worktrees.map((wt) => wt.id)
+      const orderChanged = dragOrder.some((id, i) => id !== originalOrder[i])
+      if (orderChanged) {
+        // Keep dragOrder visible until the mutation settles so the optimistic
+        // update in the React Query cache has time to land before we fall back
+        // to workspace.worktrees for rendering.
+        reorderWorktrees(dragOrder)
+          .catch(() => {})
+          .finally(() => setDragOrder(null))
+        return
+      }
+    }
+    setDragOrder(null)
   }
 
   // Keep selectedWorktree in sync with workspace updates
@@ -177,7 +194,12 @@ const Index = () => {
               </div>
 
               {/* Worktree Rows */}
-              {workspace.worktrees.map((worktree) => (
+              {(dragOrder
+                ? dragOrder
+                    .map((id) => workspace.worktrees.find((wt) => wt.id === id)!)
+                    .filter(Boolean)
+                : workspace.worktrees
+              ).map((worktree) => (
                 <WorktreeRow
                   key={worktree.id}
                   worktree={worktree}

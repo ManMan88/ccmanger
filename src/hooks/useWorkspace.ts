@@ -211,6 +211,11 @@ export function useWorkspace(workspaceId: string | null) {
         )
       }
     },
+    onSuccess: () => {
+      queryClient.invalidateQueries({
+        queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
   })
 
   // Refresh workspace (re-sync with git)
@@ -390,7 +395,7 @@ export function useWorkspace(workspaceId: string | null) {
   }
 
   const reorderWorktrees = (worktreeIds: string[]) => {
-    reorderWorktreesMutation.mutate(worktreeIds)
+    return reorderWorktreesMutation.mutateAsync(worktreeIds)
   }
 
   return {
