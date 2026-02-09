@@ -512,12 +512,8 @@ export const api = {
     },
 
     resume: async (id: string) => {
-      // Resume uses the same start command with session_id
       if (isTauri) {
-        // Get agent to retrieve worktree path for resume
-        const agent = await tauriInvoke<Agent>('get_agent', { id })
-        // Note: We need worktree path here - may need to fetch it
-        return tauriInvoke<Agent>('start_agent', { id, worktreePath: '', initialPrompt: null })
+        return tauriInvoke<Agent>('start_agent', { id, initialPrompt: null })
       }
       return request<Agent>(`/api/agents/${id}/resume`, {
         method: 'POST',

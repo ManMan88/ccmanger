@@ -16,6 +16,9 @@ use tokio::sync::{broadcast, mpsc};
 
 use crate::types::{AgentMode, AgentStatus, Permission};
 
+/// Maximum size of the per-agent PTY replay buffer (1 MB)
+const PTY_BUFFER_MAX_BYTES: usize = 1_024 * 1_024;
+
 #[derive(Error, Debug)]
 pub enum ProcessError {
     #[error("Agent {0} not found")]
@@ -56,11 +59,6 @@ pub enum ProcessEvent {
     },
 }
 
-/// Per-agent PTY I/O channel for WebSocket bridging
-struct PtyChannel {
-    input_tx: mpsc::UnboundedSender<Vec<u8>>,
-}
-
 /// Represents a running agent process (PTY-backed)
 struct AgentProcess {
     pid: u32,
@@ -68,18 +66,31 @@ struct AgentProcess {
     pty_master: Box<dyn portable_pty::MasterPty + Send>,
 }
 
+/// Consolidated per-agent runtime state. Replaces the previous 6 separate HashMaps.
+struct AgentRuntime {
+    process: Option<AgentProcess>,
+    input_tx: Option<mpsc::UnboundedSender<Vec<u8>>>,
+    broadcast_tx: Option<broadcast::Sender<Vec<u8>>>,
+    pty_buffer: Vec<u8>,
+    last_output_time: Option<std::time::Instant>,
+    is_idle: bool,
+}
+
+impl AgentRuntime {
+    /// Clear active process state while preserving the PTY buffer for terminal replay.
+    fn clear_active(&mut self) {
+        self.process = None;
+        self.input_tx = None;
+        self.broadcast_tx = None;
+        self.last_output_time = None;
+        self.is_idle = false;
+        // pty_buffer intentionally kept for terminal replay on reconnect
+    }
+}
+
 /// Manages Claude CLI agent processes
 pub struct ProcessManager {
-    processes: Arc<Mutex<HashMap<String, AgentProcess>>>,
-    pty_channels: Arc<Mutex<HashMap<String, PtyChannel>>>,
-    /// Per-agent raw byte buffer for replaying output on WebSocket reconnect
-    pty_buffers: Arc<Mutex<HashMap<String, Vec<u8>>>>,
-    /// Per-agent broadcast sender for PTY output — subscribers can connect/disconnect freely
-    pty_broadcast_txs: Arc<Mutex<HashMap<String, broadcast::Sender<Vec<u8>>>>>,
-    /// Timestamp of last PTY output per agent (for idle detection)
-    last_output_times: Arc<Mutex<HashMap<String, std::time::Instant>>>,
-    /// Whether agent is currently considered idle (waiting for input)
-    idle_flags: Arc<Mutex<HashMap<String, bool>>>,
+    agents: Arc<Mutex<HashMap<String, AgentRuntime>>>,
     event_tx: broadcast::Sender<ProcessEvent>,
     claude_cli_path: String,
 }
@@ -88,12 +99,7 @@ impl ProcessManager {
     pub fn new(claude_cli_path: String) -> Self {
         let (event_tx, _) = broadcast::channel(1000);
         Self {
-            processes: Arc::new(Mutex::new(HashMap::new())),
-            pty_channels: Arc::new(Mutex::new(HashMap::new())),
-            pty_buffers: Arc::new(Mutex::new(HashMap::new())),
-            pty_broadcast_txs: Arc::new(Mutex::new(HashMap::new())),
-            last_output_times: Arc::new(Mutex::new(HashMap::new())),
-            idle_flags: Arc::new(Mutex::new(HashMap::new())),
+            agents: Arc::new(Mutex::new(HashMap::new())),
             event_tx,
             claude_cli_path,
         }
@@ -115,8 +121,13 @@ impl ProcessManager {
         session_id: Option<&str>,
     ) -> Result<u32, ProcessError> {
         // Check if already running
-        if self.processes.lock().contains_key(agent_id) {
-            return Err(ProcessError::AlreadyRunning(agent_id.to_string()));
+        {
+            let agents = self.agents.lock();
+            if let Some(runtime) = agents.get(agent_id) {
+                if runtime.process.is_some() {
+                    return Err(ProcessError::AlreadyRunning(agent_id.to_string()));
+                }
+            }
         }
 
         // Build command arguments — interactive mode (no --print)
@@ -196,36 +207,32 @@ impl ProcessManager {
         let (output_tx, _) = broadcast::channel::<Vec<u8>>(1000);
         let (input_tx, input_rx) = mpsc::unbounded_channel::<Vec<u8>>();
 
-        let channel = PtyChannel {
-            input_tx: input_tx.clone(),
-        };
-
         let process = AgentProcess {
             pid,
             child,
             pty_master: pair.master,
         };
 
-        self.processes
-            .lock()
-            .insert(agent_id.to_string(), process);
-        self.pty_channels
-            .lock()
-            .insert(agent_id.to_string(), channel);
-        self.pty_buffers
-            .lock()
-            .insert(agent_id.to_string(), Vec::new());
-        self.pty_broadcast_txs
-            .lock()
-            .insert(agent_id.to_string(), output_tx.clone());
-
-        // Initialize idle tracking
-        self.last_output_times
-            .lock()
-            .insert(agent_id.to_string(), std::time::Instant::now());
-        self.idle_flags
-            .lock()
-            .insert(agent_id.to_string(), false);
+        // Insert or update runtime entry — clear buffer on restart
+        {
+            let mut agents = self.agents.lock();
+            let runtime = agents
+                .entry(agent_id.to_string())
+                .or_insert_with(|| AgentRuntime {
+                    process: None,
+                    input_tx: None,
+                    broadcast_tx: None,
+                    pty_buffer: Vec::new(),
+                    last_output_time: None,
+                    is_idle: false,
+                });
+            runtime.process = Some(process);
+            runtime.input_tx = Some(input_tx);
+            runtime.broadcast_tx = Some(output_tx.clone());
+            runtime.pty_buffer.clear();
+            runtime.last_output_time = Some(std::time::Instant::now());
+            runtime.is_idle = false;
+        }
 
         // Start raw byte output reader
         self.start_output_reader(agent_id.to_string(), reader, output_tx);
@@ -251,12 +258,15 @@ impl ProcessManager {
 
     /// Send a message to an agent via the PTY input channel
     pub fn send_message(&self, agent_id: &str, content: &str) -> Result<(), ProcessError> {
-        let channels = self.pty_channels.lock();
-        let channel = channels
+        let agents = self.agents.lock();
+        let runtime = agents
             .get(agent_id)
             .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
-        channel
+        let input_tx = runtime
             .input_tx
+            .as_ref()
+            .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
+        input_tx
             .send(format!("{}\n", content).into_bytes())
             .map_err(|_| {
                 ProcessError::Io(std::io::Error::new(
@@ -269,9 +279,13 @@ impl ProcessManager {
 
     /// Stop an agent process
     pub fn stop_agent(&self, agent_id: &str, force: bool) -> Result<(), ProcessError> {
-        let mut processes = self.processes.lock();
-        let process = processes
+        let mut agents = self.agents.lock();
+        let runtime = agents
             .get_mut(agent_id)
+            .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
+        let process = runtime
+            .process
+            .as_mut()
             .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
 
         if force {
@@ -279,13 +293,7 @@ impl ProcessManager {
                 .child
                 .kill()
                 .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
-            // For force stop, remove immediately and emit exit event
-            processes.remove(agent_id);
-            self.pty_channels.lock().remove(agent_id);
-            self.pty_broadcast_txs.lock().remove(agent_id);
-            self.last_output_times.lock().remove(agent_id);
-            self.idle_flags.lock().remove(agent_id);
-            // Keep pty_buffers for replay on reconnect
+            runtime.clear_active();
             let _ = self.event_tx.send(ProcessEvent::Exit {
                 agent_id: agent_id.to_string(),
                 code: None,
@@ -306,7 +314,7 @@ impl ProcessManager {
                     .kill()
                     .map_err(|e| ProcessError::SpawnFailed(e.to_string()))?;
             }
-            // Do NOT remove from map or emit exit event — the exit poller will handle it
+            // Do NOT clear_active — the exit poller will handle it
         }
 
         Ok(())
@@ -314,29 +322,35 @@ impl ProcessManager {
 
     /// Check if an agent is currently running
     pub fn is_running(&self, agent_id: &str) -> bool {
-        self.processes.lock().contains_key(agent_id)
+        self.agents
+            .lock()
+            .get(agent_id)
+            .is_some_and(|r| r.process.is_some())
     }
 
     /// Get count of running agents
     pub fn get_running_count(&self) -> usize {
-        self.processes.lock().len()
+        self.agents
+            .lock()
+            .values()
+            .filter(|r| r.process.is_some())
+            .count()
     }
 
     /// Stop all running agents
     pub fn stop_all(&self) {
-        let mut processes = self.processes.lock();
-        for (agent_id, mut process) in processes.drain() {
-            let _ = process.child.kill();
-            let _ = self.event_tx.send(ProcessEvent::Exit {
-                agent_id,
-                code: None,
-                signal: Some("SIGKILL".to_string()),
-            });
+        let mut agents = self.agents.lock();
+        for (agent_id, runtime) in agents.iter_mut() {
+            if let Some(ref mut process) = runtime.process {
+                let _ = process.child.kill();
+                let _ = self.event_tx.send(ProcessEvent::Exit {
+                    agent_id: agent_id.clone(),
+                    code: None,
+                    signal: Some("SIGKILL".to_string()),
+                });
+            }
+            runtime.clear_active();
         }
-        self.pty_channels.lock().clear();
-        self.pty_broadcast_txs.lock().clear();
-        self.last_output_times.lock().clear();
-        self.idle_flags.lock().clear();
     }
 
     /// Subscribe to PTY output for an agent. Can be called multiple times —
@@ -346,30 +360,31 @@ impl ProcessManager {
         &self,
         agent_id: &str,
     ) -> Option<(broadcast::Receiver<Vec<u8>>, Vec<u8>)> {
-        let tx = self.pty_broadcast_txs.lock().get(agent_id)?.clone();
+        let agents = self.agents.lock();
+        let runtime = agents.get(agent_id)?;
+        let tx = runtime.broadcast_tx.as_ref()?;
         let rx = tx.subscribe();
-        let buffer = self
-            .pty_buffers
-            .lock()
-            .get(agent_id)
-            .cloned()
-            .unwrap_or_default();
+        let buffer = runtime.pty_buffer.clone();
         Some((rx, buffer))
     }
 
     /// Get a cloneable PTY input sender for an agent
     pub fn get_pty_input_tx(&self, agent_id: &str) -> Option<mpsc::UnboundedSender<Vec<u8>>> {
-        self.pty_channels
+        self.agents
             .lock()
             .get(agent_id)
-            .map(|ch| ch.input_tx.clone())
+            .and_then(|r| r.input_tx.clone())
     }
 
     /// Resize PTY for an agent
     pub fn resize_pty(&self, agent_id: &str, rows: u16, cols: u16) -> Result<(), ProcessError> {
-        let processes = self.processes.lock();
-        let process = processes
+        let agents = self.agents.lock();
+        let runtime = agents
             .get(agent_id)
+            .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
+        let process = runtime
+            .process
+            .as_ref()
             .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
         process
             .pty_master
@@ -390,9 +405,7 @@ impl ProcessManager {
         mut reader: Box<dyn Read + Send>,
         output_tx: broadcast::Sender<Vec<u8>>,
     ) {
-        let buffers = self.pty_buffers.clone();
-        let last_output_times = self.last_output_times.clone();
-        let idle_flags = self.idle_flags.clone();
+        let agents = self.agents.clone();
         let event_tx = self.event_tx.clone();
 
         tokio::task::spawn_blocking(move || {
@@ -402,26 +415,31 @@ impl ProcessManager {
                     Ok(0) => break,
                     Ok(n) => {
                         let chunk = buf[..n].to_vec();
-                        // Update last output timestamp for idle detection
-                        if let Some(ts) = last_output_times.lock().get_mut(&agent_id) {
-                            *ts = std::time::Instant::now();
-                        }
-                        // If agent was idle, flip back to Running
-                        if let Some(flag) = idle_flags.lock().get_mut(&agent_id) {
-                            if *flag {
-                                *flag = false;
-                                let _ = event_tx.send(ProcessEvent::Status {
-                                    agent_id: agent_id.clone(),
-                                    status: AgentStatus::Running,
-                                    reason: None,
-                                });
+                        // Single lock: update timestamp, idle flag, and buffer
+                        {
+                            let mut map = agents.lock();
+                            if let Some(runtime) = map.get_mut(&agent_id) {
+                                // Update last output timestamp for idle detection
+                                runtime.last_output_time = Some(std::time::Instant::now());
+                                // If agent was idle, flip back to Running
+                                if runtime.is_idle {
+                                    runtime.is_idle = false;
+                                    let _ = event_tx.send(ProcessEvent::Status {
+                                        agent_id: agent_id.clone(),
+                                        status: AgentStatus::Running,
+                                        reason: None,
+                                    });
+                                }
+                                // Append to replay buffer with cap
+                                runtime.pty_buffer.extend_from_slice(&chunk);
+                                if runtime.pty_buffer.len() > PTY_BUFFER_MAX_BYTES {
+                                    let excess =
+                                        runtime.pty_buffer.len() - PTY_BUFFER_MAX_BYTES;
+                                    runtime.pty_buffer.drain(0..excess);
+                                }
                             }
                         }
-                        // Append to replay buffer
-                        if let Some(buffer) = buffers.lock().get_mut(&agent_id) {
-                            buffer.extend_from_slice(&chunk);
-                        }
-                        // Broadcast to WebSocket subscribers (ignore error = no subscribers, that's fine)
+                        // Broadcast outside lock (no subscribers is fine)
                         let _ = output_tx.send(chunk);
                     }
                     Err(e) => {
@@ -455,11 +473,7 @@ impl ProcessManager {
 
     /// Start exit poller — checks if the child process has exited
     fn start_exit_poller(&self, agent_id: String) {
-        let processes = self.processes.clone();
-        let pty_channels = self.pty_channels.clone();
-        let pty_broadcast_txs = self.pty_broadcast_txs.clone();
-        let last_output_times = self.last_output_times.clone();
-        let idle_flags = self.idle_flags.clone();
+        let agents = self.agents.clone();
         let event_tx = self.event_tx.clone();
 
         tokio::spawn(async move {
@@ -467,36 +481,32 @@ impl ProcessManager {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
 
                 let should_exit = {
-                    let mut procs = processes.lock();
-                    if let Some(process) = procs.get_mut(&agent_id) {
-                        match process.child.try_wait() {
-                            Ok(Some(status)) => {
-                                let exit_code = if status.success() { Some(0) } else { None };
-                                let _ = event_tx.send(ProcessEvent::Exit {
-                                    agent_id: agent_id.clone(),
-                                    code: exit_code,
-                                    signal: None,
-                                });
-                                procs.remove(&agent_id);
-                                pty_channels.lock().remove(&agent_id);
-                                pty_broadcast_txs.lock().remove(&agent_id);
-                                last_output_times.lock().remove(&agent_id);
-                                idle_flags.lock().remove(&agent_id);
-                                // Keep pty_buffers for replay
-                                true
+                    let mut map = agents.lock();
+                    if let Some(runtime) = map.get_mut(&agent_id) {
+                        if let Some(ref mut process) = runtime.process {
+                            match process.child.try_wait() {
+                                Ok(Some(status)) => {
+                                    let exit_code =
+                                        if status.success() { Some(0) } else { None };
+                                    let _ = event_tx.send(ProcessEvent::Exit {
+                                        agent_id: agent_id.clone(),
+                                        code: exit_code,
+                                        signal: None,
+                                    });
+                                    runtime.clear_active();
+                                    true
+                                }
+                                Ok(None) => false,
+                                Err(_) => {
+                                    runtime.clear_active();
+                                    true
+                                }
                             }
-                            Ok(None) => false,
-                            Err(_) => {
-                                procs.remove(&agent_id);
-                                pty_channels.lock().remove(&agent_id);
-                                pty_broadcast_txs.lock().remove(&agent_id);
-                                last_output_times.lock().remove(&agent_id);
-                                idle_flags.lock().remove(&agent_id);
-                                true
-                            }
+                        } else {
+                            true // No process — exit poller done
                         }
                     } else {
-                        true
+                        true // Agent removed entirely
                     }
                 };
 
@@ -510,10 +520,7 @@ impl ProcessManager {
     /// Start idle monitor — detects Running↔Idle/Waiting transitions based on output activity
     /// and PTY buffer content.
     fn start_idle_monitor(&self, agent_id: String) {
-        let processes = self.processes.clone();
-        let last_output_times = self.last_output_times.clone();
-        let idle_flags = self.idle_flags.clone();
-        let pty_buffers = self.pty_buffers.clone();
+        let agents = self.agents.clone();
         let event_tx = self.event_tx.clone();
         let idle_threshold = std::time::Duration::from_secs(3);
 
@@ -521,53 +528,49 @@ impl ProcessManager {
             loop {
                 tokio::time::sleep(tokio::time::Duration::from_secs(1)).await;
 
-                // Exit if agent is no longer in the process map
-                if !processes.lock().contains_key(&agent_id) {
-                    break;
-                }
+                let action = {
+                    let mut map = agents.lock();
+                    let Some(runtime) = map.get_mut(&agent_id) else {
+                        break; // Agent removed
+                    };
 
-                let elapsed = {
-                    let times = last_output_times.lock();
-                    match times.get(&agent_id) {
-                        Some(ts) => ts.elapsed(),
-                        None => break, // Agent was cleaned up
+                    // Exit if agent is no longer running
+                    if runtime.process.is_none() {
+                        break;
+                    }
+
+                    let Some(last_time) = runtime.last_output_time else {
+                        break; // No timestamp — agent was cleaned up
+                    };
+
+                    let elapsed = last_time.elapsed();
+                    if elapsed >= idle_threshold && !runtime.is_idle {
+                        runtime.is_idle = true;
+
+                        // Check the last portion of PTY buffer to distinguish Waiting vs Idle
+                        let tail_start = runtime.pty_buffer.len().saturating_sub(200);
+                        let tail = &runtime.pty_buffer[tail_start..];
+                        let text = String::from_utf8_lossy(tail);
+                        let is_waiting = is_waiting_prompt(&text);
+
+                        let (status, reason) = if is_waiting {
+                            (AgentStatus::Waiting, "Waiting for user input".to_string())
+                        } else {
+                            (AgentStatus::Idle, "Agent idle at prompt".to_string())
+                        };
+
+                        Some((status, reason))
+                    } else {
+                        None
                     }
                 };
 
-                if elapsed >= idle_threshold {
-                    let mut flags = idle_flags.lock();
-                    if let Some(flag) = flags.get_mut(&agent_id) {
-                        if !*flag {
-                            *flag = true;
-
-                            // Check the last portion of PTY buffer to distinguish Waiting vs Idle
-                            let is_waiting = {
-                                let buffers = pty_buffers.lock();
-                                if let Some(buf) = buffers.get(&agent_id) {
-                                    let tail_start = buf.len().saturating_sub(200);
-                                    let tail = &buf[tail_start..];
-                                    let text = String::from_utf8_lossy(tail);
-                                    is_waiting_prompt(&text)
-                                } else {
-                                    false
-                                }
-                            };
-
-                            let (status, reason) = if is_waiting {
-                                (AgentStatus::Waiting, "Waiting for user input".to_string())
-                            } else {
-                                (AgentStatus::Idle, "Agent idle at prompt".to_string())
-                            };
-
-                            let _ = event_tx.send(ProcessEvent::Status {
-                                agent_id: agent_id.clone(),
-                                status,
-                                reason: Some(reason),
-                            });
-                        }
-                    } else {
-                        break; // Agent was cleaned up
-                    }
+                if let Some((status, reason)) = action {
+                    let _ = event_tx.send(ProcessEvent::Status {
+                        agent_id: agent_id.clone(),
+                        status,
+                        reason: Some(reason),
+                    });
                 }
             }
         });
@@ -632,4 +635,115 @@ fn is_waiting_prompt(text: &str) -> bool {
     }
 
     false
+}
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+
+    #[test]
+    fn new_process_manager_has_zero_running() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert_eq!(pm.get_running_count(), 0);
+    }
+
+    #[test]
+    fn subscribe_pty_output_nonexistent_returns_none() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert!(pm.subscribe_pty_output("nonexistent").is_none());
+    }
+
+    #[test]
+    fn get_pty_input_tx_nonexistent_returns_none() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert!(pm.get_pty_input_tx("nonexistent").is_none());
+    }
+
+    #[test]
+    fn send_message_nonexistent_returns_err() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert!(pm.send_message("nonexistent", "hello").is_err());
+    }
+
+    #[test]
+    fn stop_agent_nonexistent_returns_err() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert!(pm.stop_agent("nonexistent", false).is_err());
+    }
+
+    #[test]
+    fn resize_pty_nonexistent_returns_err() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert!(pm.resize_pty("nonexistent", 24, 80).is_err());
+    }
+
+    #[test]
+    fn stop_all_on_empty_does_not_panic() {
+        let pm = ProcessManager::new("echo".to_string());
+        pm.stop_all(); // should not panic
+        assert_eq!(pm.get_running_count(), 0);
+    }
+
+    #[test]
+    fn is_running_returns_false_for_unknown() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert!(!pm.is_running("unknown"));
+    }
+
+    #[test]
+    fn clear_active_preserves_buffer() {
+        let (tx, _) = broadcast::channel(10);
+        let (input_tx, _) = mpsc::unbounded_channel();
+        let mut runtime = AgentRuntime {
+            process: None,
+            input_tx: Some(input_tx),
+            broadcast_tx: Some(tx),
+            pty_buffer: vec![1, 2, 3, 4, 5],
+            last_output_time: Some(std::time::Instant::now()),
+            is_idle: true,
+        };
+        runtime.clear_active();
+        assert!(runtime.process.is_none());
+        assert!(runtime.input_tx.is_none());
+        assert!(runtime.broadcast_tx.is_none());
+        assert!(runtime.last_output_time.is_none());
+        assert!(!runtime.is_idle);
+        // Buffer preserved
+        assert_eq!(runtime.pty_buffer, vec![1, 2, 3, 4, 5]);
+    }
+
+    #[test]
+    fn pty_buffer_cap_drains_excess() {
+        let mut buffer: Vec<u8> = vec![0u8; PTY_BUFFER_MAX_BYTES];
+        // Simulate appending a 4KB chunk
+        let chunk = vec![1u8; 4096];
+        buffer.extend_from_slice(&chunk);
+        assert!(buffer.len() > PTY_BUFFER_MAX_BYTES);
+        let excess = buffer.len() - PTY_BUFFER_MAX_BYTES;
+        buffer.drain(0..excess);
+        assert_eq!(buffer.len(), PTY_BUFFER_MAX_BYTES);
+        // The tail should be the new chunk data
+        assert_eq!(buffer[buffer.len() - 4096..], chunk[..]);
+    }
+
+    #[test]
+    fn pty_buffer_under_cap_not_drained() {
+        let mut buffer: Vec<u8> = vec![0u8; 1000];
+        let chunk = vec![1u8; 500];
+        buffer.extend_from_slice(&chunk);
+        // Under cap — no drain needed
+        assert_eq!(buffer.len(), 1500);
+        assert!(buffer.len() <= PTY_BUFFER_MAX_BYTES);
+    }
+
+    #[test]
+    fn is_waiting_prompt_detects_patterns() {
+        assert!(is_waiting_prompt("Continue? [Y/n]"));
+        assert!(is_waiting_prompt("Allow read access?"));
+        assert!(is_waiting_prompt("Do you want to proceed?"));
+        assert!(is_waiting_prompt("Approve this action"));
+        assert!(is_waiting_prompt("Continue? (yes/no)"));
+        assert!(!is_waiting_prompt("Processing..."));
+        assert!(!is_waiting_prompt(""));
+    }
 }

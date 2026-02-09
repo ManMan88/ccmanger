@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react'
+import { useState } from 'react'
 import type { Agent, AgentMode } from '@claude-manager/shared'
 import { useAgent } from '@/hooks/useAgents'
 import { useAgentSubscription, useWebSocket } from '@/hooks/useWebSocket'
@@ -59,13 +59,6 @@ export function AgentModal({
 
   // Find the agent from props (for display purposes before API data loads)
   const currentAgent = agentData || agents.find((a) => a.id === selectedAgentId)
-
-  // Auto-start agent when modal opens and agent is idle with no process
-  useEffect(() => {
-    if (open && currentAgent?.status === 'idle' && !currentAgent?.pid && !isStarting) {
-      startAgent()
-    }
-  }, [open, currentAgent?.status])
 
   if (!currentAgent || agents.length === 0) return null
 
