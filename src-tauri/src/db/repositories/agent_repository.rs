@@ -271,6 +271,19 @@ impl AgentRepository {
         Ok(())
     }
 
+    /// Find all agents with non-NULL PIDs (orphaned from previous run)
+    pub fn find_with_pids(&self) -> DbResult<Vec<(String, i32)>> {
+        let conn = self.pool.get()?;
+        let mut stmt = conn.prepare(
+            "SELECT id, pid FROM agents WHERE pid IS NOT NULL",
+        )?;
+        let rows = stmt.query_map([], |row| {
+            Ok((row.get::<_, String>(0)?, row.get::<_, i32>(1)?))
+        })?;
+        let results: Vec<(String, i32)> = rows.filter_map(|r| r.ok()).collect();
+        Ok(results)
+    }
+
     pub fn clear_running_pids(&self) -> DbResult<()> {
         let conn = self.pool.get()?;
         conn.execute(

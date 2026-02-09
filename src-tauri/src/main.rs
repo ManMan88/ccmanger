@@ -36,8 +36,21 @@ fn main() {
 
             tracing::info!("Database initialized");
 
-            // Clear any orphaned process PIDs from previous run
+            // Kill orphaned processes from previous run, then clear PIDs in DB
             let agent_repo = db::repositories::AgentRepository::new(pool.clone());
+            if let Ok(orphans) = agent_repo.find_with_pids() {
+                for (agent_id, pid) in &orphans {
+                    tracing::info!("Killing orphaned process {} for agent {}", pid, agent_id);
+                    #[cfg(unix)]
+                    unsafe {
+                        libc::kill(*pid, libc::SIGTERM);
+                    }
+                }
+                if !orphans.is_empty() {
+                    // Brief pause to let processes exit gracefully
+                    std::thread::sleep(std::time::Duration::from_millis(500));
+                }
+            }
             if let Err(e) = agent_repo.clear_running_pids() {
                 tracing::warn!("Failed to clear orphaned PIDs: {}", e);
             }
@@ -142,8 +155,6 @@ fn main() {
             commands::delete_agent,
             commands::start_agent,
             commands::stop_agent,
-            commands::send_message_to_agent,
-            commands::get_agent_messages,
             commands::fork_agent,
             commands::restore_agent,
             commands::reorder_agents,

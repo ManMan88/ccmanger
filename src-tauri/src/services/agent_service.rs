@@ -5,11 +5,9 @@ use std::sync::Arc;
 use thiserror::Error;
 use uuid::Uuid;
 
-use crate::db::{AgentRepository, DbPool, MessageRepository};
+use crate::db::{AgentRepository, DbPool};
 use crate::services::{ProcessError, ProcessManager};
-use crate::types::{
-    Agent, AgentMode, AgentStatus, Message, MessageRole, Permission, UpdateAgentInput,
-};
+use crate::types::{Agent, AgentMode, AgentStatus, Permission, UpdateAgentInput};
 
 #[derive(Error, Debug)]
 pub enum AgentError {
@@ -25,15 +23,13 @@ pub enum AgentError {
 
 pub struct AgentService {
     agent_repo: AgentRepository,
-    message_repo: MessageRepository,
     process_manager: Arc<ProcessManager>,
 }
 
 impl AgentService {
     pub fn new(pool: DbPool, process_manager: Arc<ProcessManager>) -> Self {
         Self {
-            agent_repo: AgentRepository::new(pool.clone()),
-            message_repo: MessageRepository::new(pool),
+            agent_repo: AgentRepository::new(pool),
             process_manager,
         }
     }
@@ -165,47 +161,6 @@ impl AgentService {
         // will update when the process actually exits
 
         self.get_agent(id)
-    }
-
-    /// Send a message to an agent
-    pub fn send_message(&self, id: &str, content: &str) -> Result<Message, AgentError> {
-        let now = chrono::Utc::now().to_rfc3339();
-        let message = Message {
-            id: format!(
-                "msg_{}{}",
-                chrono::Utc::now().timestamp_millis(),
-                &Uuid::new_v4().to_string()[..8]
-            ),
-            agent_id: id.to_string(),
-            role: MessageRole::User,
-            content: content.to_string(),
-            token_count: None,
-            tool_name: None,
-            tool_input: None,
-            tool_output: None,
-            created_at: now,
-            is_complete: true,
-        };
-
-        self.message_repo
-            .create(&message)
-            .map_err(|e| AgentError::Database(e.to_string()))?;
-
-        self.process_manager.send_message(id, content)?;
-
-        Ok(message)
-    }
-
-    /// Get messages for an agent
-    pub fn get_messages(
-        &self,
-        agent_id: &str,
-        limit: usize,
-        before: Option<&str>,
-    ) -> Result<(Vec<Message>, bool, Option<String>), AgentError> {
-        self.message_repo
-            .get_paginated(agent_id, limit, before)
-            .map_err(|e| AgentError::Database(e.to_string()))
     }
 
     /// Delete an agent

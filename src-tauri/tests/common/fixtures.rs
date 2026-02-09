@@ -5,8 +5,7 @@
 #![allow(dead_code)]
 
 use claude_manager_lib::types::{
-    Agent, AgentMode, AgentStatus, Message, MessageRole, Permission, Workspace, Worktree,
-    SortMode,
+    Agent, AgentMode, AgentStatus, Permission, Workspace, Worktree, SortMode,
 };
 use uuid::Uuid;
 
@@ -111,53 +110,6 @@ pub fn create_running_agent(worktree_id: &str) -> Agent {
     agent.pid = Some(12345);
     agent.started_at = Some(chrono::Utc::now().to_rfc3339());
     agent
-}
-
-/// Create a test message
-pub fn create_message(agent_id: &str) -> Message {
-    let now = chrono::Utc::now().to_rfc3339();
-    Message {
-        id: format!("msg_{}{}",
-            chrono::Utc::now().timestamp_millis(),
-            &Uuid::new_v4().to_string()[..8]
-        ),
-        agent_id: agent_id.to_string(),
-        role: MessageRole::User,
-        content: "Test message content".to_string(),
-        token_count: None,
-        tool_name: None,
-        tool_input: None,
-        tool_output: None,
-        created_at: now,
-        is_complete: true,
-    }
-}
-
-/// Create a user message
-pub fn create_user_message(agent_id: &str, content: &str) -> Message {
-    let mut msg = create_message(agent_id);
-    msg.content = content.to_string();
-    msg.role = MessageRole::User;
-    msg
-}
-
-/// Create an assistant message
-pub fn create_assistant_message(agent_id: &str, content: &str) -> Message {
-    let mut msg = create_message(agent_id);
-    msg.content = content.to_string();
-    msg.role = MessageRole::Assistant;
-    msg
-}
-
-/// Create a tool use message
-pub fn create_tool_message(agent_id: &str, tool_name: &str, input: &str, output: &str) -> Message {
-    let mut msg = create_message(agent_id);
-    msg.role = MessageRole::Assistant;
-    msg.content = String::new();
-    msg.tool_name = Some(tool_name.to_string());
-    msg.tool_input = Some(input.to_string());
-    msg.tool_output = Some(output.to_string());
-    msg
 }
 
 /// Builder for creating agents with various configurations

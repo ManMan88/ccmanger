@@ -14,5 +14,5 @@ pub use migration_tool::{
     MigrationStats,
 };
 pub use repositories::{
-    AgentRepository, MessageRepository, UsageRepository, WorkspaceRepository, WorktreeRepository,
+    AgentRepository, UsageRepository, WorkspaceRepository, WorktreeRepository,
 };

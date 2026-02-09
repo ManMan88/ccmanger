@@ -117,22 +117,6 @@ impl MockProcessManager {
             .unwrap_or(false)
     }
 
-    /// Send a message to a mock agent (just adds to output)
-    pub fn send_message(&self, agent_id: &str, content: &str) -> Result<(), MockProcessError> {
-        let mut processes = self.processes.lock().unwrap();
-        if let Some(process) = processes.get_mut(agent_id) {
-            if !process.is_running {
-                return Err(MockProcessError::NotRunning);
-            }
-            process.add_output(&format!("User: {}", content));
-            // Simulate assistant response
-            process.add_output(&format!("Assistant: Received message: {}", content));
-            Ok(())
-        } else {
-            Err(MockProcessError::NotFound)
-        }
-    }
-
     /// Get the output lines for an agent
     pub fn get_output(&self, agent_id: &str) -> Vec<String> {
         self.processes
@@ -185,7 +169,6 @@ pub enum MockProcessError {
     SpawnFailed,
     NotFound,
     NotRunning,
-    SendFailed,
 }
 
 impl std::fmt::Display for MockProcessError {
@@ -194,7 +177,6 @@ impl std::fmt::Display for MockProcessError {
             Self::SpawnFailed => write!(f, "Failed to spawn process"),
             Self::NotFound => write!(f, "Process not found"),
             Self::NotRunning => write!(f, "Process is not running"),
-            Self::SendFailed => write!(f, "Failed to send message"),
         }
     }
 }
@@ -273,24 +255,6 @@ mod tests {
 
         pm.stop_agent("test_agent", false).unwrap();
         assert!(!pm.is_running("test_agent"));
-    }
-
-    #[test]
-    fn test_mock_process_manager_send_message() {
-        let pm = MockProcessManager::new();
-        pm.spawn_agent(
-            "test_agent",
-            "/tmp",
-            AgentMode::Regular,
-            &[],
-            None,
-            None,
-        ).unwrap();
-
-        pm.send_message("test_agent", "Hello").unwrap();
-
-        let output = pm.get_output("test_agent");
-        assert!(output.iter().any(|l| l.contains("Hello")));
     }
 
     #[test]

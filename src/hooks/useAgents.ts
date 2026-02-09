@@ -1,7 +1,7 @@
 import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
 import { api, type CreateAgentDto, type UpdateAgentDto } from '@/lib/api'
 import { queryKeys } from '@/lib/queryKeys'
-import type { Agent, Message } from '@claude-manager/shared'
+import type { Agent } from '@claude-manager/shared'
 
 /**
  * Hook for managing agents in a worktree
@@ -216,7 +216,7 @@ export function useAgents(worktreeId: string | null) {
 }
 
 /**
- * Hook for a single agent with messages
+ * Hook for a single agent
  */
 export function useAgent(agentId: string | null) {
   const queryClient = useQueryClient()
@@ -225,53 +225,6 @@ export function useAgent(agentId: string | null) {
     queryKey: agentId ? queryKeys.agents.detail(agentId) : ['agents', 'none'],
     queryFn: () => api.agents.get(agentId!),
     enabled: !!agentId,
-  })
-
-  const messagesQuery = useQuery({
-    queryKey: agentId ? queryKeys.agents.messages(agentId) : ['agents', 'none', 'messages'],
-    queryFn: () => api.agents.getMessages(agentId!),
-    enabled: !!agentId,
-  })
-
-  const sendMessageMutation = useMutation({
-    mutationFn: (content: string) => api.agents.sendMessage(agentId!, content),
-    onMutate: async (content) => {
-      if (!agentId) return
-
-      // Optimistically add user message
-      const previousMessages = queryClient.getQueryData<{
-        messages: Message[]
-        hasMore: boolean
-      }>(queryKeys.agents.messages(agentId))
-
-      if (previousMessages) {
-        const newMessage: Message = {
-          id: `temp_${Date.now()}`,
-          agentId,
-          role: 'user',
-          content,
-          tokenCount: null,
-          toolName: null,
-          toolInput: null,
-          toolOutput: null,
-          createdAt: new Date().toISOString(),
-          isComplete: true,
-        }
-
-        queryClient.setQueryData(queryKeys.agents.messages(agentId), {
-          ...previousMessages,
-          messages: [...previousMessages.messages, newMessage],
-        })
-      }
-
-      return { previousMessages }
-    },
-    onError: (_err, _vars, context) => {
-      if (context?.previousMessages && agentId) {
-        queryClient.setQueryData(queryKeys.agents.messages(agentId), context.previousMessages)
-      }
-    },
-    // Messages will be updated via WebSocket, so no need to invalidate
   })
 
   const stopAgentMutation = useMutation({
@@ -303,25 +256,15 @@ export function useAgent(agentId: string | null) {
 
   return {
     agent: agentQuery.data ?? null,
-    messages: messagesQuery.data?.messages ?? [],
-    hasMoreMessages: messagesQuery.data?.hasMore ?? false,
-    isLoading: agentQuery.isLoading || messagesQuery.isLoading,
-    isLoadingMessages: messagesQuery.isLoading,
-    isError: agentQuery.isError || messagesQuery.isError,
+    isLoading: agentQuery.isLoading,
+    isError: agentQuery.isError,
 
-    sendMessage: sendMessageMutation.mutate,
     stopAgent: stopAgentMutation.mutate,
     startAgent: startAgentMutation.mutate,
     resumeAgent: resumeAgentMutation.mutate,
 
-    isSending: sendMessageMutation.isPending,
     isStopping: stopAgentMutation.isPending,
     isStarting: startAgentMutation.isPending,
     isResuming: resumeAgentMutation.isPending,
-
-    refetchMessages: () =>
-      queryClient.invalidateQueries({
-        queryKey: agentId ? queryKeys.agents.messages(agentId) : ['none'],
-      }),
   }
 }

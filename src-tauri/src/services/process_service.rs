@@ -279,27 +279,6 @@ impl ProcessManager {
         Ok((pid, effective_session_id))
     }
 
-    /// Send a message to an agent via the PTY input channel
-    pub fn send_message(&self, agent_id: &str, content: &str) -> Result<(), ProcessError> {
-        let agents = self.agents.lock();
-        let runtime = agents
-            .get(agent_id)
-            .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
-        let input_tx = runtime
-            .input_tx
-            .as_ref()
-            .ok_or_else(|| ProcessError::AgentNotFound(agent_id.to_string()))?;
-        input_tx
-            .send(format!("{}\n", content).into_bytes())
-            .map_err(|_| {
-                ProcessError::Io(std::io::Error::new(
-                    std::io::ErrorKind::BrokenPipe,
-                    "PTY closed",
-                ))
-            })?;
-        Ok(())
-    }
-
     /// Stop an agent process
     pub fn stop_agent(&self, agent_id: &str, force: bool) -> Result<(), ProcessError> {
         let mut agents = self.agents.lock();
@@ -787,12 +766,6 @@ mod tests {
     fn get_pty_input_tx_nonexistent_returns_none() {
         let pm = ProcessManager::new("echo".to_string());
         assert!(pm.get_pty_input_tx("nonexistent").is_none());
-    }
-
-    #[test]
-    fn send_message_nonexistent_returns_err() {
-        let pm = ProcessManager::new("echo".to_string());
-        assert!(pm.send_message("nonexistent", "hello").is_err());
     }
 
     #[test]

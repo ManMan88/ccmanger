@@ -3,8 +3,8 @@
 use tauri::State;
 
 use crate::types::{
-    Agent, AgentListResponse, AgentMode, CreateAgentInput, MessageListResponse, Permission,
-    ReorderAgentsInput, SendMessageInput, SendMessageResponse, UpdateAgentInput,
+    Agent, AgentListResponse, AgentMode, CreateAgentInput, Permission, ReorderAgentsInput,
+    UpdateAgentInput,
 };
 use crate::AppState;
 
@@ -103,45 +103,6 @@ pub async fn stop_agent(
         .agent_service
         .stop_agent(&id, force.unwrap_or(false))
         .map_err(|e| e.to_string())
-}
-
-/// Send a message to an agent
-#[tauri::command]
-pub async fn send_message_to_agent(
-    id: String,
-    input: SendMessageInput,
-    state: State<'_, AppState>,
-) -> Result<SendMessageResponse, String> {
-    let message = state
-        .agent_service
-        .send_message(&id, &input.content)
-        .map_err(|e| e.to_string())?;
-
-    Ok(SendMessageResponse {
-        message_id: message.id,
-        status: "sent".to_string(),
-        running: true,
-    })
-}
-
-/// Get messages for an agent
-#[tauri::command]
-pub async fn get_agent_messages(
-    id: String,
-    limit: Option<usize>,
-    before: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<MessageListResponse, String> {
-    let (messages, has_more, next_cursor) = state
-        .agent_service
-        .get_messages(&id, limit.unwrap_or(100), before.as_deref())
-        .map_err(|e| e.to_string())?;
-
-    Ok(MessageListResponse {
-        messages,
-        has_more,
-        next_cursor,
-    })
 }
 
 /// Fork an agent

@@ -1,6 +1,6 @@
 import { queryClient } from './queryClient'
 import { queryKeys } from './queryKeys'
-import type { Agent, Message, AgentStatus } from '@claude-manager/shared'
+import type { Agent, AgentStatus } from '@claude-manager/shared'
 
 type MessageHandler = (data: unknown) => void
 
