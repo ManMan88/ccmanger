@@ -58,9 +58,10 @@ interface WorktreeRowProps {
   onLoadPreviousAgent: (agentId: string) => void
   onSetSortMode: (sortMode: SortMode) => void
   isDragging?: boolean
-  onDragStart?: () => void
+  onDragStart?: (e: React.DragEvent) => void
   onDragOver?: (e: React.DragEvent) => void
   onDragEnd?: () => void
+  onDrop?: (e: React.DragEvent) => void
 }
 
 const statusOrder: Record<AgentStatus, number> = {
@@ -86,6 +87,7 @@ export function WorktreeRow({
   onDragStart,
   onDragOver,
   onDragEnd,
+  onDrop,
 }: WorktreeRowProps) {
   const [draggedAgent, setDraggedAgent] = useState<string | null>(null)
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false)
@@ -151,6 +153,7 @@ export function WorktreeRow({
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
+        onDrop={onDrop}
       >
         {/* Header */}
         <div className="worktree-header">
@@ -279,7 +282,10 @@ export function WorktreeRow({
                   <div
                     key={agent.id}
                     draggable={worktree.sortMode === 'free'}
-                    onDragStart={() => handleDragStart(agent.id)}
+                    onDragStart={(e) => {
+                      e.stopPropagation()
+                      handleDragStart(agent.id)
+                    }}
                     onDragOver={(e) => handleDragOver(e, agent.id)}
                     onDragEnd={handleDragEnd}
                     className={`w-56 flex-shrink-0 ${worktree.sortMode !== 'free' ? 'cursor-default' : ''}`}

@@ -203,7 +203,7 @@ export function useWorkspace(workspaceId: string | null) {
       return { previousWorkspace }
     },
     onError: (_err, _vars, context) => {
-      // Rollback on error
+      console.error('reorderWorktrees failed:', _err)
       if (context?.previousWorkspace) {
         queryClient.setQueryData(
           queryKeys.workspaces.detail(workspaceId!),
@@ -395,7 +395,7 @@ export function useWorkspace(workspaceId: string | null) {
   }
 
   const reorderWorktrees = (worktreeIds: string[]) => {
-    return reorderWorktreesMutation.mutateAsync(worktreeIds)
+    reorderWorktreesMutation.mutate(worktreeIds)
   }
 
   return {

@@ -1,4 +1,4 @@
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 import { Toolbar } from '@/components/Toolbar'
 import { WorktreeRow } from '@/components/WorktreeRow'
 import { UsageBar } from '@/components/UsageBar'
@@ -60,6 +60,7 @@ const Index = () => {
   const [addWorktreeOpen, setAddWorktreeOpen] = useState(false)
   const [settingsOpen, setSettingsOpen] = useState(false)
   const [draggedWorktreeId, setDraggedWorktreeId] = useState<string | null>(null)
+  const draggedWorktreeIdRef = useRef<string | null>(null)
   const [dragOrder, setDragOrder] = useState<string[] | null>(null)
 
   // Auto-select first workspace if none selected
@@ -85,8 +86,11 @@ const Index = () => {
     setSelectedAgentId(agent.id)
   }
 
-  const handleWorktreeDragStart = (worktreeId: string) => {
+  const handleWorktreeDragStart = (e: React.DragEvent, worktreeId: string) => {
+    e.dataTransfer.setData('text/plain', worktreeId)
+    e.dataTransfer.effectAllowed = 'move'
     setDraggedWorktreeId(worktreeId)
+    draggedWorktreeIdRef.current = worktreeId
     if (workspace) {
       setDragOrder(workspace.worktrees.map((wt) => wt.id))
     }
@@ -94,37 +98,56 @@ const Index = () => {
 
   const handleWorktreeDragOver = (e: React.DragEvent, targetWorktreeId: string) => {
     e.preventDefault()
-    if (!draggedWorktreeId || draggedWorktreeId === targetWorktreeId || !dragOrder) return
+    e.dataTransfer.dropEffect = 'move'
+    const dragged = draggedWorktreeIdRef.current
+    if (!dragged || dragged === targetWorktreeId) return
 
-    const draggedIndex = dragOrder.indexOf(draggedWorktreeId)
-    const targetIndex = dragOrder.indexOf(targetWorktreeId)
+    setDragOrder((prev) => {
+      if (!prev) return prev
+      const draggedIndex = prev.indexOf(dragged)
+      const targetIndex = prev.indexOf(targetWorktreeId)
+      if (draggedIndex === -1 || targetIndex === -1) return prev
+      const newOrder = [...prev]
+      newOrder.splice(draggedIndex, 1)
+      newOrder.splice(targetIndex, 0, dragged)
+      return newOrder
+    })
+  }
 
-    if (draggedIndex === -1 || targetIndex === -1) return
-
-    const newOrder = [...dragOrder]
-    newOrder.splice(draggedIndex, 1)
-    newOrder.splice(targetIndex, 0, draggedWorktreeId)
-
-    setDragOrder(newOrder)
+  const handleWorktreeDrop = (e: React.DragEvent) => {
+    e.preventDefault()
   }
 
   const handleWorktreeDragEnd = () => {
     setDraggedWorktreeId(null)
+    draggedWorktreeIdRef.current = null
     if (dragOrder && workspace) {
       const originalOrder = workspace.worktrees.map((wt) => wt.id)
       const orderChanged = dragOrder.some((id, i) => id !== originalOrder[i])
       if (orderChanged) {
-        // Keep dragOrder visible until the mutation settles so the optimistic
-        // update in the React Query cache has time to land before we fall back
-        // to workspace.worktrees for rendering.
         reorderWorktrees(dragOrder)
-          .catch(() => {})
-          .finally(() => setDragOrder(null))
-        return
+        return // keep dragOrder set — effects handle cleanup
       }
     }
     setDragOrder(null)
   }
+
+  // Clear dragOrder once the workspace cache reflects the new order
+  const workspaceOrder = workspace?.worktrees.map((wt) => wt.id).join(',') ?? ''
+
+  useEffect(() => {
+    if (dragOrder && !draggedWorktreeId && workspaceOrder === dragOrder.join(',')) {
+      setDragOrder(null)
+    }
+  }, [dragOrder, draggedWorktreeId, workspaceOrder])
+
+  // Safety timeout: clear dragOrder after 1s if the cache never catches up
+  useEffect(() => {
+    if (dragOrder && !draggedWorktreeId) {
+      const timer = setTimeout(() => setDragOrder(null), 1000)
+      return () => clearTimeout(timer)
+    }
+  }, [dragOrder, draggedWorktreeId])
 
   // Keep selectedWorktree in sync with workspace updates
   const currentWorktree = selectedWorktree
@@ -214,9 +237,10 @@ const Index = () => {
                   onLoadPreviousAgent={(agentId) => loadPreviousAgent(worktree.id, agentId)}
                   onSetSortMode={(sortMode) => setSortMode(worktree.id, sortMode)}
                   isDragging={draggedWorktreeId === worktree.id}
-                  onDragStart={() => handleWorktreeDragStart(worktree.id)}
+                  onDragStart={(e) => handleWorktreeDragStart(e, worktree.id)}
                   onDragOver={(e) => handleWorktreeDragOver(e, worktree.id)}
                   onDragEnd={handleWorktreeDragEnd}
+                  onDrop={handleWorktreeDrop}
                 />
               ))}
 
