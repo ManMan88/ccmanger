@@ -11,7 +11,7 @@ import type {
 } from '@claude-manager/shared'
 
 // Check if running in Tauri
-const isTauri = typeof window !== 'undefined' && '__TAURI__' in window
+const isTauri = typeof window !== 'undefined' && '__TAURI_INTERNALS__' in window
 
 const API_BASE_URL = import.meta.env.VITE_API_URL || 'http://localhost:3001'
 
@@ -638,9 +638,7 @@ export const api = {
 
 // Dialog utilities
 export async function openDirectoryPicker(): Promise<string | null> {
-  // Check at call time, not module load time
-  const tauriAvailable = typeof window !== 'undefined' && '__TAURI__' in window
-  if (!tauriAvailable) {
+  if (!isTauri) {
     // Fallback for non-Tauri environments
     return prompt('Enter the path to a Git repository:')
   }
