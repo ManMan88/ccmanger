@@ -4,6 +4,7 @@
 //! including database row types and API response types.
 
 pub mod agent;
+pub mod hook;
 pub mod message;
 pub mod usage;
 pub mod websocket;
@@ -11,6 +12,7 @@ pub mod workspace;
 pub mod worktree;
 
 pub use agent::*;
+pub use hook::*;
 pub use message::*;
 pub use usage::*;
 pub use websocket::*;

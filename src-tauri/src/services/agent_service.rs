@@ -130,7 +130,7 @@ impl AgentService {
     ) -> Result<Agent, AgentError> {
         let agent = self.get_agent(id)?;
 
-        let pid = self.process_manager.spawn_agent(
+        let (pid, session_id) = self.process_manager.spawn_agent(
             id,
             worktree_path,
             agent.mode,
@@ -141,6 +141,11 @@ impl AgentService {
 
         self.agent_repo
             .update_status(id, AgentStatus::Running, Some(pid as i32))
+            .map_err(|e| AgentError::Database(e.to_string()))?;
+
+        // Persist session_id for future resume and hook matching
+        self.agent_repo
+            .update_session_id(id, &session_id)
             .map_err(|e| AgentError::Database(e.to_string()))?;
 
         self.get_agent(id)

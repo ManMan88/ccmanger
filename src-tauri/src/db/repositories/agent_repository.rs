@@ -258,6 +258,19 @@ impl AgentRepository {
         Ok(())
     }
 
+    pub fn update_session_id(&self, id: &str, session_id: &str) -> DbResult<()> {
+        let conn = self.pool.get()?;
+        conn.execute(
+            r#"
+            UPDATE agents
+            SET session_id = ?, updated_at = datetime('now')
+            WHERE id = ?
+        "#,
+            params![session_id, id],
+        )?;
+        Ok(())
+    }
+
     pub fn clear_running_pids(&self) -> DbResult<()> {
         let conn = self.pool.get()?;
         conn.execute(

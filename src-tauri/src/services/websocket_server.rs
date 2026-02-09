@@ -6,8 +6,8 @@ use axum::{
         Path, State,
     },
     response::IntoResponse,
-    routing::get,
-    Router,
+    routing::{get, post},
+    Json, Router,
 };
 use chrono::Utc;
 use futures::{SinkExt, StreamExt};
@@ -20,7 +20,7 @@ use crate::services::process_service::ProcessManager;
 use crate::services::ProcessEvent;
 use crate::types::{
     AgentContextPayload, AgentErrorPayload, AgentOutputPayload, AgentStatusPayload,
-    AgentTerminatedPayload, WsClientMessage, WsServerMessage,
+    AgentTerminatedPayload, AgentStatus, HookNotification, WsClientMessage, WsServerMessage,
 };
 
 /// Connected client information
@@ -190,6 +190,7 @@ pub async fn start_websocket_server(
     let app = Router::new()
         .route("/ws", get(ws_handler))
         .route("/ws/pty/:agent_id", get(pty_ws_handler))
+        .route("/hooks", post(hooks_handler))
         .with_state(state);
 
     let listener = tokio::net::TcpListener::bind("127.0.0.1:3001").await?;
@@ -257,6 +258,43 @@ async fn handle_socket(socket: WebSocket, state: Arc<WsState>) {
     // Cleanup
     state.client_manager.remove_client(&client_id);
     send_task.abort();
+}
+
+// --- Hook notification endpoint ---
+
+/// POST /hooks — receives Claude Code hook notifications for instant status detection
+async fn hooks_handler(
+    State(state): State<Arc<WsState>>,
+    Json(notification): Json<HookNotification>,
+) -> impl IntoResponse {
+    let status = match notification.notification_type.as_deref() {
+        Some("permission_prompt") => Some(AgentStatus::Waiting),
+        Some("idle_prompt") => Some(AgentStatus::Idle),
+        Some("elicitation_dialog") => Some(AgentStatus::Waiting),
+        _ => None,
+    };
+
+    if let Some(status) = status {
+        if let Some(agent_id) = state
+            .process_manager
+            .find_agent_by_session(notification.session_id.as_deref())
+        {
+            tracing::debug!(
+                "Hook: agent {} → {:?} (type: {:?})",
+                agent_id,
+                status,
+                notification.notification_type,
+            );
+            state.process_manager.set_hook_status(&agent_id, status);
+        } else {
+            tracing::debug!(
+                "Hook: no agent found for session_id={:?}",
+                notification.session_id
+            );
+        }
+    }
+
+    axum::http::StatusCode::OK
 }
 
 // --- PTY WebSocket endpoint ---

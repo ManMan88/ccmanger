@@ -10,6 +10,7 @@ use parking_lot::Mutex;
 use portable_pty::{native_pty_system, CommandBuilder, PtySize};
 use std::collections::HashMap;
 use std::io::{Read, Write};
+use std::path::PathBuf;
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::{broadcast, mpsc};
@@ -74,6 +75,10 @@ struct AgentRuntime {
     pty_buffer: Vec<u8>,
     last_output_time: Option<std::time::Instant>,
     is_idle: bool,
+    /// Claude session ID for hook → agent mapping
+    session_id: Option<String>,
+    /// Timestamp of last hook-reported status (used to suppress heuristic)
+    hook_status_time: Option<std::time::Instant>,
 }
 
 impl AgentRuntime {
@@ -84,7 +89,8 @@ impl AgentRuntime {
         self.broadcast_tx = None;
         self.last_output_time = None;
         self.is_idle = false;
-        // pty_buffer intentionally kept for terminal replay on reconnect
+        self.hook_status_time = None;
+        // pty_buffer and session_id intentionally kept for terminal replay / session resume
     }
 }
 
@@ -110,7 +116,8 @@ impl ProcessManager {
         self.event_tx.subscribe()
     }
 
-    /// Spawn a new agent process
+    /// Spawn a new agent process.
+    /// Returns (pid, effective_session_id) on success.
     pub fn spawn_agent(
         &self,
         agent_id: &str,
@@ -119,7 +126,7 @@ impl ProcessManager {
         permissions: &[Permission],
         _initial_prompt: Option<&str>,
         session_id: Option<&str>,
-    ) -> Result<u32, ProcessError> {
+    ) -> Result<(u32, String), ProcessError> {
         // Check if already running
         {
             let agents = self.agents.lock();
@@ -158,13 +165,25 @@ impl ProcessManager {
             args.push(allowed_tools.join(","));
         }
 
-        // Session resumption
-        if let Some(sid) = session_id {
+        // Session management: resume existing or assign new session ID
+        let effective_session_id = if let Some(sid) = session_id {
             args.push("--resume".to_string());
             args.push(sid.to_string());
-        }
+            sid.to_string()
+        } else {
+            let new_sid = uuid::Uuid::new_v4().to_string();
+            args.push("--session-id".to_string());
+            args.push(new_sid.clone());
+            new_sid
+        };
 
         // No --print flag — always run interactively
+
+        // Write hook settings for deterministic status detection
+        if let Err(e) = write_hook_settings(worktree_path, 3001) {
+            tracing::warn!("Failed to write hook settings for agent {}: {}", agent_id, e);
+            // Non-fatal: idle monitor heuristic still works as fallback
+        }
 
         // Create PTY pair
         let pty_system = native_pty_system();
@@ -225,6 +244,8 @@ impl ProcessManager {
                     pty_buffer: Vec::new(),
                     last_output_time: None,
                     is_idle: false,
+                    session_id: None,
+                    hook_status_time: None,
                 });
             runtime.process = Some(process);
             runtime.input_tx = Some(input_tx);
@@ -232,6 +253,8 @@ impl ProcessManager {
             runtime.pty_buffer.clear();
             runtime.last_output_time = Some(std::time::Instant::now());
             runtime.is_idle = false;
+            runtime.hook_status_time = None;
+            runtime.session_id = Some(effective_session_id.clone());
         }
 
         // Start raw byte output reader
@@ -253,7 +276,7 @@ impl ProcessManager {
             reason: None,
         });
 
-        Ok(pid)
+        Ok((pid, effective_session_id))
     }
 
     /// Send a message to an agent via the PTY input channel
@@ -398,6 +421,40 @@ impl ProcessManager {
         Ok(())
     }
 
+    /// Find agent by Claude session_id (from hook notification)
+    pub fn find_agent_by_session(&self, session_id: Option<&str>) -> Option<String> {
+        let agents = self.agents.lock();
+        if let Some(sid) = session_id {
+            for (agent_id, runtime) in agents.iter() {
+                if runtime.session_id.as_deref() == Some(sid) && runtime.process.is_some() {
+                    return Some(agent_id.clone());
+                }
+            }
+        }
+        None
+    }
+
+    /// Update agent status from hook notification (immediate, no 3-second delay)
+    pub fn set_hook_status(&self, agent_id: &str, status: AgentStatus) {
+        {
+            let mut agents = self.agents.lock();
+            if let Some(runtime) = agents.get_mut(agent_id) {
+                runtime.is_idle = true;
+                runtime.hook_status_time = Some(std::time::Instant::now());
+            }
+        }
+        let reason = match status {
+            AgentStatus::Waiting => "Hook: waiting for user input",
+            AgentStatus::Idle => "Hook: agent idle at prompt",
+            _ => "Hook: status update",
+        };
+        let _ = self.event_tx.send(ProcessEvent::Status {
+            agent_id: agent_id.to_string(),
+            status,
+            reason: Some(reason.to_string()),
+        });
+    }
+
     /// Start raw byte reader from PTY → broadcast channel + buffer
     fn start_output_reader(
         &self,
@@ -421,6 +478,8 @@ impl ProcessManager {
                             if let Some(runtime) = map.get_mut(&agent_id) {
                                 // Update last output timestamp for idle detection
                                 runtime.last_output_time = Some(std::time::Instant::now());
+                                // Reset hook state — agent is producing output again
+                                runtime.hook_status_time = None;
                                 // If agent was idle, flip back to Running
                                 if runtime.is_idle {
                                     runtime.is_idle = false;
@@ -547,19 +606,40 @@ impl ProcessManager {
                     if elapsed >= idle_threshold && !runtime.is_idle {
                         runtime.is_idle = true;
 
-                        // Check the last portion of PTY buffer to distinguish Waiting vs Idle
-                        let tail_start = runtime.pty_buffer.len().saturating_sub(200);
-                        let tail = &runtime.pty_buffer[tail_start..];
-                        let text = String::from_utf8_lossy(tail);
-                        let is_waiting = is_waiting_prompt(&text);
+                        // If hooks reported status within the last 10 seconds, trust them
+                        if let Some(hook_time) = runtime.hook_status_time {
+                            if hook_time.elapsed() < std::time::Duration::from_secs(10) {
+                                None // Hook already set the correct status
+                            } else {
+                                // Hook is stale — fall back to heuristic
+                                let tail_start = runtime.pty_buffer.len().saturating_sub(200);
+                                let tail = &runtime.pty_buffer[tail_start..];
+                                let text = String::from_utf8_lossy(tail);
+                                let is_waiting = is_waiting_prompt(&text);
 
-                        let (status, reason) = if is_waiting {
-                            (AgentStatus::Waiting, "Waiting for user input".to_string())
+                                let (status, reason) = if is_waiting {
+                                    (AgentStatus::Waiting, "Waiting for user input".to_string())
+                                } else {
+                                    (AgentStatus::Idle, "Agent idle at prompt".to_string())
+                                };
+
+                                Some((status, reason))
+                            }
                         } else {
-                            (AgentStatus::Idle, "Agent idle at prompt".to_string())
-                        };
+                            // No hook signal — use PTY buffer heuristic (fallback)
+                            let tail_start = runtime.pty_buffer.len().saturating_sub(200);
+                            let tail = &runtime.pty_buffer[tail_start..];
+                            let text = String::from_utf8_lossy(tail);
+                            let is_waiting = is_waiting_prompt(&text);
 
-                        Some((status, reason))
+                            let (status, reason) = if is_waiting {
+                                (AgentStatus::Waiting, "Waiting for user input".to_string())
+                            } else {
+                                (AgentStatus::Idle, "Agent idle at prompt".to_string())
+                            };
+
+                            Some((status, reason))
+                        }
                     } else {
                         None
                     }
@@ -575,6 +655,56 @@ impl ProcessManager {
             }
         });
     }
+}
+
+/// Write `.claude/settings.local.json` with hook configuration.
+///
+/// Claude Code reads this file on startup. The hooks fire curl commands that POST
+/// notification JSON to our /hooks endpoint, enabling instant status detection.
+fn write_hook_settings(worktree_path: &str, port: u16) -> Result<(), ProcessError> {
+    let claude_dir = PathBuf::from(worktree_path).join(".claude");
+    std::fs::create_dir_all(&claude_dir)
+        .map_err(|e| ProcessError::SpawnFailed(format!("Failed to create .claude dir: {e}")))?;
+
+    let settings_path = claude_dir.join("settings.local.json");
+
+    // Read existing settings or start fresh
+    let mut settings: serde_json::Value = if settings_path.exists() {
+        let content = std::fs::read_to_string(&settings_path).unwrap_or_default();
+        serde_json::from_str(&content).unwrap_or(serde_json::json!({}))
+    } else {
+        serde_json::json!({})
+    };
+
+    // curl posts stdin (hook JSON) to our /hooks endpoint
+    let curl_cmd = format!(
+        "curl -s -X POST http://127.0.0.1:{port}/hooks -H 'Content-Type: application/json' -d @-"
+    );
+    settings["hooks"] = serde_json::json!({
+        "Notification": [
+            {
+                "matcher": "permission_prompt",
+                "hooks": [{ "type": "command", "command": curl_cmd }]
+            },
+            {
+                "matcher": "idle_prompt",
+                "hooks": [{ "type": "command", "command": curl_cmd }]
+            },
+            {
+                "matcher": "elicitation_dialog",
+                "hooks": [{ "type": "command", "command": curl_cmd }]
+            }
+        ]
+    });
+
+    std::fs::write(
+        &settings_path,
+        serde_json::to_string_pretty(&settings)
+            .map_err(|e| ProcessError::SpawnFailed(format!("Failed to serialize settings: {e}")))?,
+    )
+    .map_err(|e| ProcessError::SpawnFailed(format!("Failed to write hook settings: {e}")))?;
+
+    Ok(())
 }
 
 /// Strip ANSI escape sequences from a string
@@ -701,6 +831,8 @@ mod tests {
             pty_buffer: vec![1, 2, 3, 4, 5],
             last_output_time: Some(std::time::Instant::now()),
             is_idle: true,
+            session_id: Some("test-session".to_string()),
+            hook_status_time: Some(std::time::Instant::now()),
         };
         runtime.clear_active();
         assert!(runtime.process.is_none());
@@ -708,8 +840,10 @@ mod tests {
         assert!(runtime.broadcast_tx.is_none());
         assert!(runtime.last_output_time.is_none());
         assert!(!runtime.is_idle);
-        // Buffer preserved
+        assert!(runtime.hook_status_time.is_none());
+        // Buffer and session_id preserved
         assert_eq!(runtime.pty_buffer, vec![1, 2, 3, 4, 5]);
+        assert_eq!(runtime.session_id.as_deref(), Some("test-session"));
     }
 
     #[test]
@@ -745,5 +879,144 @@ mod tests {
         assert!(is_waiting_prompt("Continue? (yes/no)"));
         assert!(!is_waiting_prompt("Processing..."));
         assert!(!is_waiting_prompt(""));
+    }
+
+    #[test]
+    fn find_agent_by_session_returns_matching_agent() {
+        let pm = ProcessManager::new("echo".to_string());
+        // Manually insert a runtime with session_id and a mock process marker
+        {
+            let mut agents = pm.agents.lock();
+            agents.insert(
+                "agent-1".to_string(),
+                AgentRuntime {
+                    process: None, // no process → won't match (must be running)
+                    input_tx: None,
+                    broadcast_tx: None,
+                    pty_buffer: Vec::new(),
+                    last_output_time: None,
+                    is_idle: false,
+                    session_id: Some("session-abc".to_string()),
+                    hook_status_time: None,
+                },
+            );
+        }
+        // Without a running process, should return None
+        assert!(pm.find_agent_by_session(Some("session-abc")).is_none());
+    }
+
+    #[test]
+    fn find_agent_by_session_returns_none_for_unknown() {
+        let pm = ProcessManager::new("echo".to_string());
+        assert!(pm.find_agent_by_session(Some("nonexistent")).is_none());
+        assert!(pm.find_agent_by_session(None).is_none());
+    }
+
+    #[test]
+    fn set_hook_status_emits_event_and_sets_fields() {
+        let pm = ProcessManager::new("echo".to_string());
+        let mut rx = pm.subscribe();
+
+        // Insert a runtime entry
+        {
+            let mut agents = pm.agents.lock();
+            agents.insert(
+                "agent-1".to_string(),
+                AgentRuntime {
+                    process: None,
+                    input_tx: None,
+                    broadcast_tx: None,
+                    pty_buffer: Vec::new(),
+                    last_output_time: None,
+                    is_idle: false,
+                    session_id: Some("s1".to_string()),
+                    hook_status_time: None,
+                },
+            );
+        }
+
+        pm.set_hook_status("agent-1", AgentStatus::Waiting);
+
+        // Check runtime state
+        {
+            let agents = pm.agents.lock();
+            let runtime = agents.get("agent-1").unwrap();
+            assert!(runtime.is_idle);
+            assert!(runtime.hook_status_time.is_some());
+        }
+
+        // Check emitted event
+        let event = rx.try_recv().unwrap();
+        match event {
+            ProcessEvent::Status {
+                agent_id,
+                status,
+                reason,
+            } => {
+                assert_eq!(agent_id, "agent-1");
+                assert_eq!(status, AgentStatus::Waiting);
+                assert!(reason.unwrap().contains("Hook"));
+            }
+            _ => panic!("Expected Status event"),
+        }
+    }
+
+    #[test]
+    fn write_hook_settings_creates_file() {
+        let dir = tempfile::tempdir().unwrap();
+        let worktree_path = dir.path().to_str().unwrap();
+
+        write_hook_settings(worktree_path, 3001).unwrap();
+
+        let settings_path = dir.path().join(".claude").join("settings.local.json");
+        assert!(settings_path.exists());
+
+        let content = std::fs::read_to_string(&settings_path).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        // Verify hooks structure
+        assert!(parsed["hooks"]["Notification"].is_array());
+        let notifications = parsed["hooks"]["Notification"].as_array().unwrap();
+        assert_eq!(notifications.len(), 3);
+
+        // Verify matchers
+        let matchers: Vec<&str> = notifications
+            .iter()
+            .map(|n| n["matcher"].as_str().unwrap())
+            .collect();
+        assert!(matchers.contains(&"permission_prompt"));
+        assert!(matchers.contains(&"idle_prompt"));
+        assert!(matchers.contains(&"elicitation_dialog"));
+
+        // Verify curl command contains correct port
+        let cmd = notifications[0]["hooks"][0]["command"].as_str().unwrap();
+        assert!(cmd.contains("3001"));
+        assert!(cmd.contains("curl"));
+    }
+
+    #[test]
+    fn write_hook_settings_preserves_existing_settings() {
+        let dir = tempfile::tempdir().unwrap();
+        let worktree_path = dir.path().to_str().unwrap();
+
+        // Create existing settings
+        let claude_dir = dir.path().join(".claude");
+        std::fs::create_dir_all(&claude_dir).unwrap();
+        std::fs::write(
+            claude_dir.join("settings.local.json"),
+            r#"{"someExistingSetting": true}"#,
+        )
+        .unwrap();
+
+        write_hook_settings(worktree_path, 3001).unwrap();
+
+        let content =
+            std::fs::read_to_string(claude_dir.join("settings.local.json")).unwrap();
+        let parsed: serde_json::Value = serde_json::from_str(&content).unwrap();
+
+        // Existing setting preserved
+        assert_eq!(parsed["someExistingSetting"], true);
+        // Hooks added
+        assert!(parsed["hooks"]["Notification"].is_array());
     }
 }
