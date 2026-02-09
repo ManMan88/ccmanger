@@ -8,6 +8,7 @@ import {
   type UpdateAgentDto,
 } from '@/lib/api'
 import { queryKeys } from '@/lib/queryKeys'
+import { toast } from '@/hooks/use-toast'
 import type { Agent, Workspace, SortMode } from '@claude-manager/shared'
 
 // Re-export types that components might need
@@ -121,6 +122,13 @@ export function useWorkspace(workspaceId: string | null) {
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.workspaces.detail(workspaceId!),
+      })
+    },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to add worktree',
+        description: error instanceof Error ? error.message : String(error),
       })
     },
   })
@@ -341,8 +349,8 @@ export function useWorkspace(workspaceId: string | null) {
   const workspace = transformWorkspace(workspaceQuery.data ?? null)
 
   // Wrapper functions to match old interface
-  const addWorktree = (name: string, branch: string) => {
-    addWorktreeMutation.mutate({ name, branch })
+  const addWorktree = (name: string, branch: string, createBranch?: boolean) => {
+    return addWorktreeMutation.mutateAsync({ name, branch, createBranch })
   }
 
   const removeWorktree = (worktreeId: string) => {

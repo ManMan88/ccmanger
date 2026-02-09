@@ -40,37 +40,70 @@ impl GitService {
     }
 
     /// List all worktrees for a repository
+    ///
+    /// Uses `git worktree list --porcelain` instead of git2 APIs to reliably
+    /// discover all worktrees regardless of which worktree path is used to open
+    /// the repository.
     pub fn list_worktrees(path: &str) -> Result<Vec<WorktreeInfo>, GitError> {
-        let repo = Repository::open(path)?;
+        let output = std::process::Command::new("git")
+            .args(["worktree", "list", "--porcelain"])
+            .current_dir(path)
+            .output()?;
+
+        if !output.status.success() {
+            let stderr = String::from_utf8_lossy(&output.stderr);
+            return Err(GitError::NotARepo(format!(
+                "git worktree list failed: {}",
+                stderr.trim()
+            )));
+        }
+
+        let stdout = String::from_utf8_lossy(&output.stdout);
         let mut worktrees = Vec::new();
 
-        // Main worktree
-        let main_path = repo
-            .workdir()
-            .ok_or_else(|| GitError::NotARepo("No workdir".to_string()))?
-            .to_string_lossy()
-            .to_string();
+        // Porcelain format: blocks separated by blank lines
+        // Each block has lines like:
+        //   worktree /path/to/worktree
+        //   HEAD <sha>
+        //   branch refs/heads/<name>
+        for block in stdout.split("\n\n") {
+            let block = block.trim();
+            if block.is_empty() {
+                continue;
+            }
 
-        worktrees.push(WorktreeInfo {
-            path: main_path.trim_end_matches('/').to_string(),
-            branch: Self::get_current_branch(path)?,
-            is_main: true,
-        });
+            let mut wt_path = None;
+            let mut branch = String::new();
 
-        // Additional worktrees
-        if let Ok(wt_names) = repo.worktrees() {
-            for name in wt_names.iter().flatten() {
-                if let Ok(wt) = repo.find_worktree(name) {
-                    if let Some(wt_path) = wt.path().to_str() {
-                        let branch = Self::get_current_branch(wt_path).unwrap_or_default();
-                        worktrees.push(WorktreeInfo {
-                            path: wt_path.to_string(),
-                            branch,
-                            is_main: false,
-                        });
-                    }
+            for line in block.lines() {
+                if let Some(p) = line.strip_prefix("worktree ") {
+                    wt_path = Some(p.to_string());
+                } else if let Some(b) = line.strip_prefix("branch ") {
+                    // branch line is like "branch refs/heads/master"
+                    branch = b
+                        .strip_prefix("refs/heads/")
+                        .unwrap_or(b)
+                        .to_string();
+                } else if line == "detached" {
+                    branch = "HEAD (detached)".to_string();
                 }
             }
+
+            if let Some(p) = wt_path {
+                let is_main = worktrees.is_empty(); // first entry is always the main worktree
+                worktrees.push(WorktreeInfo {
+                    path: p,
+                    branch,
+                    is_main,
+                });
+            }
+        }
+
+        if worktrees.is_empty() {
+            return Err(GitError::NotARepo(format!(
+                "No worktrees found at: {}",
+                path
+            )));
         }
 
         Ok(worktrees)

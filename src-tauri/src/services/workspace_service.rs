@@ -1,5 +1,6 @@
 //! Workspace service for managing git workspaces
 
+use std::collections::{HashMap, HashSet};
 use thiserror::Error;
 use uuid::Uuid;
 
@@ -95,8 +96,14 @@ impl WorkspaceService {
     }
 
     /// Get a workspace with full details
+    ///
+    /// Automatically rescans git worktrees before returning, so the DB
+    /// always reflects the current state of `git worktree list`.
     pub fn get_workspace_with_details(&self, id: &str) -> Result<WorkspaceWithDetails, WorkspaceError> {
         let workspace = self.get_workspace(id)?;
+
+        // Rescan worktrees from git to pick up any changes
+        self.scan_worktrees(id, &workspace.path)?;
 
         let worktrees = self
             .worktree_repo
@@ -156,18 +163,45 @@ impl WorkspaceService {
     }
 
     /// Scan and sync worktrees from git
+    ///
+    /// Performs a full sync: adds new worktrees, updates changed ones
+    /// (branch/is_main), and removes DB records for worktrees no longer in git.
     fn scan_worktrees(&self, workspace_id: &str, repo_path: &str) -> Result<(), WorkspaceError> {
         let git_worktrees =
             GitService::list_worktrees(repo_path).map_err(|e| WorkspaceError::Git(e.to_string()))?;
 
-        for wt_info in git_worktrees {
-            // Check if worktree already exists
-            if self
-                .worktree_repo
-                .find_by_path(&wt_info.path)
-                .map_err(|e| WorkspaceError::Database(e.to_string()))?
-                .is_none()
-            {
+        // Normalize git paths (trim trailing '/')
+        let git_paths: HashSet<String> = git_worktrees
+            .iter()
+            .map(|wt| wt.path.trim_end_matches('/').to_string())
+            .collect();
+
+        // Build lookup from DB
+        let db_worktrees = self
+            .worktree_repo
+            .find_by_workspace_id(workspace_id)
+            .map_err(|e| WorkspaceError::Database(e.to_string()))?;
+
+        let db_by_path: HashMap<String, crate::types::Worktree> = db_worktrees
+            .into_iter()
+            .map(|wt| (wt.path.trim_end_matches('/').to_string(), wt))
+            .collect();
+
+        // Add new + update existing
+        for wt_info in &git_worktrees {
+            let normalized_path = wt_info.path.trim_end_matches('/').to_string();
+
+            if let Some(existing) = db_by_path.get(&normalized_path) {
+                // Update if branch or is_main changed
+                if existing.branch != wt_info.branch || existing.is_main != wt_info.is_main {
+                    let mut updated = existing.clone();
+                    updated.branch = wt_info.branch.clone();
+                    updated.is_main = wt_info.is_main;
+                    self.worktree_repo
+                        .update(&updated)
+                        .map_err(|e| WorkspaceError::Database(e.to_string()))?;
+                }
+            } else {
                 // Create new worktree record
                 let now = chrono::Utc::now().to_rfc3339();
                 let worktree = crate::types::Worktree {
@@ -182,8 +216,8 @@ impl WorkspaceService {
                         .and_then(|n| n.to_str())
                         .unwrap_or("unnamed")
                         .to_string(),
-                    branch: wt_info.branch,
-                    path: wt_info.path,
+                    branch: wt_info.branch.clone(),
+                    path: wt_info.path.clone(),
                     sort_mode: crate::types::SortMode::Free,
                     display_order: 0,
                     is_main: wt_info.is_main,
@@ -193,6 +227,15 @@ impl WorkspaceService {
 
                 self.worktree_repo
                     .create(&worktree)
+                    .map_err(|e| WorkspaceError::Database(e.to_string()))?;
+            }
+        }
+
+        // Remove stale DB records not present in git
+        for (path, db_wt) in &db_by_path {
+            if !git_paths.contains(path) {
+                self.worktree_repo
+                    .delete(&db_wt.id)
                     .map_err(|e| WorkspaceError::Database(e.to_string()))?;
             }
         }
