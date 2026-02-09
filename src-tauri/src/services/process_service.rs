@@ -2,8 +2,8 @@
 
 use parking_lot::RwLock;
 use std::collections::HashMap;
-use std::io::Write;
-use std::process::{Child, Command, Stdio};
+use std::io::{BufRead, BufReader, Write};
+use std::process::{Child, ChildStderr, ChildStdout, Command, Stdio};
 use std::sync::Arc;
 use thiserror::Error;
 use tokio::sync::broadcast;
@@ -54,8 +54,6 @@ pub enum ProcessEvent {
 struct AgentProcess {
     pid: u32,
     child: Child,
-    #[allow(dead_code)]
-    output_buffer: String,
 }
 
 /// Manages Claude CLI agent processes
@@ -136,7 +134,7 @@ impl ProcessManager {
         }
 
         // Spawn process
-        let child = Command::new(&self.claude_cli_path)
+        let mut child = Command::new(&self.claude_cli_path)
             .args(&args)
             .current_dir(worktree_path)
             .stdin(Stdio::piped())
@@ -149,10 +147,13 @@ impl ProcessManager {
 
         let pid = child.id();
 
+        // Take stdout/stderr before inserting child into map
+        let stdout = child.stdout.take();
+        let stderr = child.stderr.take();
+
         let process = AgentProcess {
             pid,
             child,
-            output_buffer: String::new(),
         };
 
         self.processes
@@ -160,7 +161,7 @@ impl ProcessManager {
             .insert(agent_id.to_string(), process);
 
         // Start output monitoring in background
-        self.start_output_monitor(agent_id.to_string());
+        self.start_output_monitor(agent_id.to_string(), stdout, stderr);
 
         // Emit running status
         let _ = self.event_tx.send(ProcessEvent::Status {
@@ -196,28 +197,27 @@ impl ProcessManager {
 
         if force {
             process.child.kill()?;
+            // For force stop, remove immediately and emit exit event
+            processes.remove(agent_id);
+            let _ = self.event_tx.send(ProcessEvent::Exit {
+                agent_id: agent_id.to_string(),
+                code: None,
+                signal: Some("SIGKILL".to_string()),
+            });
         } else {
-            // Graceful termination
+            // Graceful stop: send SIGINT (Ctrl+C), let the exit monitor detect exit
             #[cfg(unix)]
             {
                 unsafe {
-                    libc::kill(process.pid as i32, libc::SIGTERM);
+                    libc::kill(process.pid as i32, libc::SIGINT);
                 }
             }
             #[cfg(not(unix))]
             {
                 process.child.kill()?;
             }
+            // Do NOT remove from map or emit exit event — the output monitor will handle it
         }
-
-        // Remove from tracking - the monitor will emit the exit event
-        processes.remove(agent_id);
-
-        let _ = self.event_tx.send(ProcessEvent::Exit {
-            agent_id: agent_id.to_string(),
-            code: None,
-            signal: Some(if force { "SIGKILL" } else { "SIGTERM" }.to_string()),
-        });
 
         Ok(())
     }
@@ -246,10 +246,57 @@ impl ProcessManager {
     }
 
     /// Start monitoring output from an agent process
-    fn start_output_monitor(&self, agent_id: String) {
+    fn start_output_monitor(
+        &self,
+        agent_id: String,
+        stdout: Option<ChildStdout>,
+        stderr: Option<ChildStderr>,
+    ) {
         let processes = self.processes.clone();
         let event_tx = self.event_tx.clone();
 
+        // Stdout reader task
+        if let Some(stdout) = stdout {
+            let agent_id = agent_id.clone();
+            let event_tx = event_tx.clone();
+            tokio::task::spawn_blocking(move || {
+                let reader = BufReader::new(stdout);
+                for line in reader.lines() {
+                    match line {
+                        Ok(content) => {
+                            let _ = event_tx.send(ProcessEvent::Output {
+                                agent_id: agent_id.clone(),
+                                content,
+                                is_complete: true,
+                            });
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+        }
+
+        // Stderr reader task
+        if let Some(stderr) = stderr {
+            let agent_id = agent_id.clone();
+            let event_tx = event_tx.clone();
+            tokio::task::spawn_blocking(move || {
+                let reader = BufReader::new(stderr);
+                for line in reader.lines() {
+                    match line {
+                        Ok(content) => {
+                            let _ = event_tx.send(ProcessEvent::Error {
+                                agent_id: agent_id.clone(),
+                                message: content,
+                            });
+                        }
+                        Err(_) => break,
+                    }
+                }
+            });
+        }
+
+        // Exit poller task
         tokio::spawn(async move {
             loop {
                 tokio::time::sleep(tokio::time::Duration::from_millis(100)).await;
@@ -267,12 +314,11 @@ impl ProcessManager {
                                 procs.remove(&agent_id);
                                 true
                             }
-                            Ok(None) => {
-                                // Process still running - could read stdout here
-                                // For now, we rely on the process to output to streams
-                                false
+                            Ok(None) => false,
+                            Err(_) => {
+                                procs.remove(&agent_id);
+                                true
                             }
-                            Err(_) => true,
                         }
                     } else {
                         true

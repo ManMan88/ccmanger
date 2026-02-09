@@ -3,6 +3,7 @@
 ## Overview
 
 Claude Manager uses SQLite for data persistence. SQLite was chosen for:
+
 - Zero configuration required
 - Single file database (easy backup/portability)
 - Excellent read performance for our use case
@@ -116,7 +117,7 @@ CREATE TABLE agents (
     id TEXT PRIMARY KEY,
     worktree_id TEXT NOT NULL,
     name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'waiting' CHECK(status IN ('running', 'waiting', 'error', 'finished')),
+    status TEXT NOT NULL DEFAULT 'finished' CHECK(status IN ('running', 'waiting', 'error', 'finished')),
     context_level INTEGER NOT NULL DEFAULT 0 CHECK(context_level >= 0 AND context_level <= 100),
     mode TEXT NOT NULL DEFAULT 'regular' CHECK(mode IN ('auto', 'plan', 'regular')),
     permissions TEXT NOT NULL DEFAULT '["read"]', -- JSON array
@@ -454,7 +455,7 @@ export function up(db: Database): void {
       id TEXT PRIMARY KEY,
       worktree_id TEXT NOT NULL,
       name TEXT NOT NULL,
-      status TEXT NOT NULL DEFAULT 'waiting' CHECK(status IN ('running', 'waiting', 'error', 'finished')),
+      status TEXT NOT NULL DEFAULT 'finished' CHECK(status IN ('running', 'waiting', 'error', 'finished')),
       context_level INTEGER NOT NULL DEFAULT 0 CHECK(context_level >= 0 AND context_level <= 100),
       mode TEXT NOT NULL DEFAULT 'regular' CHECK(mode IN ('auto', 'plan', 'regular')),
       permissions TEXT NOT NULL DEFAULT '["read"]',
@@ -681,9 +682,7 @@ export class AgentRepository {
   constructor(private db: Database.Database) {}
 
   findById(id: string): AgentRow | null {
-    return this.db
-      .prepare('SELECT * FROM agents WHERE id = ?')
-      .get(id) as AgentRow | null
+    return this.db.prepare('SELECT * FROM agents WHERE id = ?').get(id) as AgentRow | null
   }
 
   findByWorktreeId(worktreeId: string, includeDeleted = false): AgentRow[] {
@@ -711,10 +710,23 @@ export class AgentRepository {
 
     const displayOrder = (maxOrder.max ?? -1) + 1
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       INSERT INTO agents (id, worktree_id, name, mode, permissions, display_order, created_at, updated_at)
       VALUES (?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(id, dto.worktreeId, dto.name, dto.mode, JSON.stringify(dto.permissions), displayOrder, now, now)
+    `
+      )
+      .run(
+        id,
+        dto.worktreeId,
+        dto.name,
+        dto.mode,
+        JSON.stringify(dto.permissions),
+        displayOrder,
+        now,
+        now
+      )
 
     return this.findById(id)!
   }
@@ -756,18 +768,26 @@ export class AgentRepository {
     params.push(new Date().toISOString())
     params.push(id)
 
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE agents SET ${updates.join(', ')} WHERE id = ?
-    `).run(...params)
+    `
+      )
+      .run(...params)
 
     return this.findById(id)!
   }
 
   softDelete(id: string): void {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE agents SET deleted_at = ?, status = 'finished', pid = NULL
       WHERE id = ?
-    `).run(new Date().toISOString(), id)
+    `
+      )
+      .run(new Date().toISOString(), id)
   }
 
   hardDelete(id: string): void {
@@ -775,10 +795,14 @@ export class AgentRepository {
   }
 
   restore(id: string): AgentRow {
-    this.db.prepare(`
+    this.db
+      .prepare(
+        `
       UPDATE agents SET deleted_at = NULL, updated_at = ?
       WHERE id = ?
-    `).run(new Date().toISOString(), id)
+    `
+      )
+      .run(new Date().toISOString(), id)
 
     return this.findById(id)!
   }
@@ -817,8 +841,9 @@ export function createBackup(db: Database.Database, backupDir: string): string {
   db.backup(backupPath)
 
   // Clean old backups (keep last 10)
-  const backups = fs.readdirSync(backupDir)
-    .filter(f => f.startsWith('data.db.bak.'))
+  const backups = fs
+    .readdirSync(backupDir)
+    .filter((f) => f.startsWith('data.db.bak.'))
     .sort()
     .reverse()
 

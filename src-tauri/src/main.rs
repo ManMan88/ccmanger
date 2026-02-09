@@ -56,6 +56,9 @@ fn main() {
             let worktree_service = Arc::new(services::WorktreeService::new(pool.clone()));
             let usage_service = Arc::new(services::UsageService::new(pool.clone()));
 
+            // Create DB sync repo before pool moves into app state
+            let db_sync_repo = db::repositories::AgentRepository::new(pool.clone());
+
             // Create app state
             let app_state = AppState {
                 pool,
@@ -74,6 +77,39 @@ fn main() {
             tauri::async_runtime::spawn(async move {
                 if let Err(e) = services::start_websocket_server(ws_rx).await {
                     tracing::error!("WebSocket server error: {}", e);
+                }
+            });
+
+            // Sync process events to database status
+            let db_sync_rx = process_manager.subscribe();
+            tauri::async_runtime::spawn(async move {
+                let mut rx = db_sync_rx;
+                while let Ok(event) = rx.recv().await {
+                    match event {
+                        services::ProcessEvent::Exit { ref agent_id, .. } => {
+                            if let Err(e) = db_sync_repo.update_status(
+                                agent_id,
+                                claude_manager_lib::types::AgentStatus::Finished,
+                                None,
+                            ) {
+                                tracing::warn!("Failed to sync exit status for {}: {}", agent_id, e);
+                            }
+                        }
+                        services::ProcessEvent::Status {
+                            ref agent_id,
+                            ref status,
+                            ..
+                        } => {
+                            if let Err(e) = db_sync_repo.update_status(agent_id, status.clone(), None) {
+                                tracing::warn!(
+                                    "Failed to sync status for {}: {}",
+                                    agent_id,
+                                    e
+                                );
+                            }
+                        }
+                        _ => {}
+                    }
                 }
             });
 

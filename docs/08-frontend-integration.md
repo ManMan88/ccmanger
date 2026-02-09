@@ -7,6 +7,7 @@ This document provides detailed guidance for integrating the React frontend with
 ## Current Frontend State
 
 The frontend currently uses:
+
 - **Mock data** in `useWorkspace.ts` hook
 - **In-memory state** with React `useState`
 - **No persistence** - data lost on refresh
@@ -87,11 +88,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
       )
     }
 
-    throw new ApiError(
-      'UNKNOWN_ERROR',
-      'An unexpected error occurred',
-      response.status
-    )
+    throw new ApiError('UNKNOWN_ERROR', 'An unexpected error occurred', response.status)
   }
 
   if (response.status === 204) {
@@ -102,10 +99,7 @@ async function handleResponse<T>(response: Response): Promise<T> {
 }
 
 // Generic request function
-async function request<T>(
-  endpoint: string,
-  options: RequestInit = {}
-): Promise<T> {
+async function request<T>(endpoint: string, options: RequestInit = {}): Promise<T> {
   const url = `${API_BASE_URL}${endpoint}`
 
   const response = await fetch(url, {
@@ -125,13 +119,15 @@ export const api = {
   workspaces: {
     list: () => request<{ workspaces: Workspace[] }>('/api/workspaces'),
     get: (id: string) => request<WorkspaceWithDetails>(`/api/workspaces/${id}`),
-    create: (path: string) => request<Workspace>('/api/workspaces', {
-      method: 'POST',
-      body: JSON.stringify({ path }),
-    }),
-    delete: (id: string) => request<void>(`/api/workspaces/${id}`, {
-      method: 'DELETE',
-    }),
+    create: (path: string) =>
+      request<Workspace>('/api/workspaces', {
+        method: 'POST',
+        body: JSON.stringify({ path }),
+      }),
+    delete: (id: string) =>
+      request<void>(`/api/workspaces/${id}`, {
+        method: 'DELETE',
+      }),
   },
 
   // Worktrees
@@ -175,14 +171,16 @@ export const api = {
       return request<{ agents: Agent[] }>(`/api/agents${query ? `?${query}` : ''}`)
     },
     get: (id: string) => request<Agent>(`/api/agents/${id}`),
-    create: (data: CreateAgentDto) => request<Agent>('/api/agents', {
-      method: 'POST',
-      body: JSON.stringify(data),
-    }),
-    update: (id: string, data: UpdateAgentDto) => request<Agent>(`/api/agents/${id}`, {
-      method: 'PUT',
-      body: JSON.stringify(data),
-    }),
+    create: (data: CreateAgentDto) =>
+      request<Agent>('/api/agents', {
+        method: 'POST',
+        body: JSON.stringify(data),
+      }),
+    update: (id: string, data: UpdateAgentDto) =>
+      request<Agent>(`/api/agents/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify(data),
+      }),
     delete: (id: string, archive = true) =>
       request<void>(`/api/agents/${id}?archive=${archive}`, {
         method: 'DELETE',
@@ -192,20 +190,24 @@ export const api = {
         method: 'POST',
         body: JSON.stringify({ content }),
       }),
-    stop: (id: string) => request<Agent>(`/api/agents/${id}/stop`, {
-      method: 'POST',
-    }),
-    fork: (id: string, name?: string) => request<Agent>(`/api/agents/${id}/fork`, {
-      method: 'POST',
-      body: JSON.stringify({ name }),
-    }),
+    stop: (id: string) =>
+      request<Agent>(`/api/agents/${id}/stop`, {
+        method: 'POST',
+      }),
+    fork: (id: string, name?: string) =>
+      request<Agent>(`/api/agents/${id}/fork`, {
+        method: 'POST',
+        body: JSON.stringify({ name }),
+      }),
     reorder: (worktreeId: string, agentIds: string[]) =>
       request<void>('/api/agents/reorder', {
         method: 'PUT',
         body: JSON.stringify({ worktreeId, agentIds }),
       }),
     getMessages: (id: string, limit = 100, offset = 0) =>
-      request<{ messages: Message[] }>(`/api/agents/${id}/messages?limit=${limit}&offset=${offset}`),
+      request<{ messages: Message[] }>(
+        `/api/agents/${id}/messages?limit=${limit}&offset=${offset}`
+      ),
   },
 
   // Usage
@@ -383,8 +385,7 @@ export function useWorkspace(workspaceId: string | null) {
 
   // Add worktree mutation
   const addWorktreeMutation = useMutation({
-    mutationFn: (data: CreateWorktreeDto) =>
-      api.worktrees.create(workspaceId!, data),
+    mutationFn: (data: CreateWorktreeDto) => api.worktrees.create(workspaceId!, data),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.workspaces.detail(workspaceId!),
@@ -394,8 +395,7 @@ export function useWorkspace(workspaceId: string | null) {
 
   // Remove worktree mutation
   const removeWorktreeMutation = useMutation({
-    mutationFn: (worktreeId: string) =>
-      api.worktrees.delete(workspaceId!, worktreeId),
+    mutationFn: (worktreeId: string) => api.worktrees.delete(workspaceId!, worktreeId),
     onSuccess: () => {
       queryClient.invalidateQueries({
         queryKey: queryKeys.workspaces.detail(workspaceId!),
@@ -405,7 +405,11 @@ export function useWorkspace(workspaceId: string | null) {
 
   // Checkout branch mutation
   const checkoutBranchMutation = useMutation({
-    mutationFn: ({ worktreeId, branch, createBranch }: {
+    mutationFn: ({
+      worktreeId,
+      branch,
+      createBranch,
+    }: {
       worktreeId: string
       branch: string
       createBranch?: boolean
@@ -430,8 +434,7 @@ export function useWorkspace(workspaceId: string | null) {
 
   // Reorder worktrees mutation
   const reorderWorktreesMutation = useMutation({
-    mutationFn: (worktreeIds: string[]) =>
-      api.worktrees.reorder(workspaceId!, worktreeIds),
+    mutationFn: (worktreeIds: string[]) => api.worktrees.reorder(workspaceId!, worktreeIds),
     onMutate: async (worktreeIds) => {
       // Cancel outgoing refetches
       await queryClient.cancelQueries({
@@ -450,10 +453,10 @@ export function useWorkspace(workspaceId: string | null) {
           return { ...wt, order: index }
         })
 
-        queryClient.setQueryData(
-          queryKeys.workspaces.detail(workspaceId!),
-          { ...previousWorkspace, worktrees: reorderedWorktrees }
-        )
+        queryClient.setQueryData(queryKeys.workspaces.detail(workspaceId!), {
+          ...previousWorkspace,
+          worktrees: reorderedWorktrees,
+        })
       }
 
       return { previousWorkspace }
@@ -528,24 +531,16 @@ export function useAgents(worktreeId: string) {
       )
 
       if (previousAgents) {
-        queryClient.setQueryData(
-          queryKeys.agents.byWorktree(worktreeId),
-          {
-            agents: previousAgents.agents.map((a) =>
-              a.id === agentId ? { ...a, ...updates } : a
-            ),
-          }
-        )
+        queryClient.setQueryData(queryKeys.agents.byWorktree(worktreeId), {
+          agents: previousAgents.agents.map((a) => (a.id === agentId ? { ...a, ...updates } : a)),
+        })
       }
 
       return { previousAgents }
     },
     onError: (_err, _vars, context) => {
       if (context?.previousAgents) {
-        queryClient.setQueryData(
-          queryKeys.agents.byWorktree(worktreeId),
-          context.previousAgents
-        )
+        queryClient.setQueryData(queryKeys.agents.byWorktree(worktreeId), context.previousAgents)
       }
     },
   })
@@ -574,8 +569,7 @@ export function useAgents(worktreeId: string) {
 
   // Reorder agents
   const reorderAgentsMutation = useMutation({
-    mutationFn: (agentIds: string[]) =>
-      api.agents.reorder(worktreeId, agentIds),
+    mutationFn: (agentIds: string[]) => api.agents.reorder(worktreeId, agentIds),
     onMutate: async (agentIds) => {
       await queryClient.cancelQueries({
         queryKey: queryKeys.agents.byWorktree(worktreeId),
@@ -591,20 +585,14 @@ export function useAgents(worktreeId: string) {
           return { ...agent, order: index }
         })
 
-        queryClient.setQueryData(
-          queryKeys.agents.byWorktree(worktreeId),
-          { agents: reordered }
-        )
+        queryClient.setQueryData(queryKeys.agents.byWorktree(worktreeId), { agents: reordered })
       }
 
       return { previousAgents }
     },
     onError: (_err, _vars, context) => {
       if (context?.previousAgents) {
-        queryClient.setQueryData(
-          queryKeys.agents.byWorktree(worktreeId),
-          context.previousAgents
-        )
+        queryClient.setQueryData(queryKeys.agents.byWorktree(worktreeId), context.previousAgents)
       }
     },
   })
@@ -802,28 +790,24 @@ class WebSocketClient {
     )
 
     if (currentMessages) {
-      queryClient.setQueryData(
-        queryKeys.agents.messages(payload.agentId),
-        {
-          messages: [
-            ...currentMessages.messages,
-            {
-              id: `msg_${Date.now()}`,
-              role: payload.role,
-              content: payload.content,
-              timestamp: new Date().toISOString(),
-            },
-          ],
-        }
-      )
+      queryClient.setQueryData(queryKeys.agents.messages(payload.agentId), {
+        messages: [
+          ...currentMessages.messages,
+          {
+            id: `msg_${Date.now()}`,
+            role: payload.role,
+            content: payload.content,
+            timestamp: new Date().toISOString(),
+          },
+        ],
+      })
     }
   }
 
   private handleAgentStatus(payload: { agentId: string; status: string }): void {
     // Update agent status in cache
-    queryClient.setQueryData<Agent>(
-      queryKeys.agents.detail(payload.agentId),
-      (old) => old ? { ...old, status: payload.status as Agent['status'] } : old
+    queryClient.setQueryData<Agent>(queryKeys.agents.detail(payload.agentId), (old) =>
+      old ? { ...old, status: payload.status as Agent['status'] } : old
     )
 
     // Also update in worktree agents list
@@ -832,19 +816,21 @@ class WebSocketClient {
     if (agent) {
       queryClient.setQueryData<{ agents: Agent[] }>(
         queryKeys.agents.byWorktree(agent.worktreeId),
-        (old) => old ? {
-          agents: old.agents.map((a) =>
-            a.id === payload.agentId ? { ...a, status: payload.status as Agent['status'] } : a
-          ),
-        } : old
+        (old) =>
+          old
+            ? {
+                agents: old.agents.map((a) =>
+                  a.id === payload.agentId ? { ...a, status: payload.status as Agent['status'] } : a
+                ),
+              }
+            : old
       )
     }
   }
 
   private handleAgentContext(payload: { agentId: string; contextLevel: number }): void {
-    queryClient.setQueryData<Agent>(
-      queryKeys.agents.detail(payload.agentId),
-      (old) => old ? { ...old, contextLevel: payload.contextLevel } : old
+    queryClient.setQueryData<Agent>(queryKeys.agents.detail(payload.agentId), (old) =>
+      old ? { ...old, contextLevel: payload.contextLevel } : old
     )
   }
 
@@ -993,12 +979,15 @@ export function useWebSocket() {
   useEffect(() => {
     // Connect on mount
     if (!wsClient.isConnected) {
-      wsClient.connect().then(() => {
-        setIsConnected(true)
-      }).catch((err) => {
-        console.error('WebSocket connection failed:', err)
-        setIsConnected(false)
-      })
+      wsClient
+        .connect()
+        .then(() => {
+          setIsConnected(true)
+        })
+        .catch((err) => {
+          console.error('WebSocket connection failed:', err)
+          setIsConnected(false)
+        })
     }
 
     // Check connection status periodically
@@ -1048,66 +1037,68 @@ export function useAgentSubscription(agentId: string | null) {
 
 ### AgentModal Updates
 
+The agent modal now uses a terminal-style interface instead of chat bubbles. Output streams
+in real-time on a dark background with monospace font. The input is always enabled regardless
+of agent status — when idle, typing a message starts the agent with that prompt.
+
 ```typescript
 // src/components/AgentModal.tsx (key changes)
-import { useAgent, useAgentSubscription } from '@/hooks/useAgents'
-import { useWebSocket } from '@/hooks/useWebSocket'
+import { useAgent } from '@/hooks/useAgents'
+import { useAgentSubscription, useWebSocket } from '@/hooks/useWebSocket'
+import { useTerminalOutput } from '@/hooks/useTerminalOutput'
 
 export function AgentModal({ agentId, open, onClose }: AgentModalProps) {
-  const { agent, messages, sendMessage, isSending } = useAgent(agentId)
+  const { agent, sendMessage, startAgent, stopAgent, isSending } = useAgent(agentId)
   const { isConnected } = useWebSocket()
+  const { lines, addUserInput } = useTerminalOutput(open ? agentId : null)
 
   // Subscribe to agent updates when modal is open
   useAgentSubscription(open ? agentId : null)
 
-  const handleSendMessage = (content: string) => {
-    if (content.trim()) {
-      sendMessage(content)
+  const handleSend = (content: string) => {
+    if (!content.trim() || !agent) return
+    addUserInput(content)
+    if (agent.status === 'finished' || agent.status === 'error') {
+      startAgent(content) // Start agent with input as initial prompt
+    } else {
+      sendMessage(content) // Write to stdin
     }
   }
 
   return (
     <Dialog open={open} onOpenChange={onClose}>
       <DialogContent>
-        {/* Connection status indicator */}
-        {!isConnected && (
-          <div className="text-yellow-500 text-sm">
-            Reconnecting...
-          </div>
-        )}
-
-        {/* Agent header */}
-        {agent && (
-          <div className="flex items-center gap-2">
-            <StatusDot status={agent.status} />
-            <span>{agent.name}</span>
-            <span className="text-muted-foreground">
-              {agent.contextLevel}% context
-            </span>
-          </div>
-        )}
-
-        {/* Message list - now from API */}
-        <div className="flex-1 overflow-y-auto">
-          {messages.map((msg) => (
-            <MessageBubble key={msg.id} message={msg} />
+        {/* Terminal output area */}
+        <div className="flex-1 overflow-y-auto bg-[#300a24] p-4 font-mono text-sm">
+          {lines.map((line) => (
+            <div key={line.id} className={
+              line.type === 'user-input' ? 'text-green-400' :
+              line.type === 'stderr' ? 'text-red-400' :
+              line.type === 'system' ? 'text-yellow-500 italic' :
+              'text-gray-200'
+            }>
+              {line.type === 'user-input' ? `$ ${line.content}` : line.content}
+            </div>
           ))}
         </div>
 
-        {/* Input */}
-        <div className="flex gap-2">
-          <Textarea
-            placeholder="Type a message..."
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !e.shiftKey) {
-                e.preventDefault()
-                handleSendMessage(e.currentTarget.value)
-                e.currentTarget.value = ''
-              }
-            }}
-            disabled={isSending || agent?.status === 'finished'}
-          />
-          <Button disabled={isSending}>Send</Button>
+        {/* Terminal-style input — always enabled */}
+        <div className="bg-[#300a24] px-4 py-3 font-mono">
+          <div className="flex items-center gap-2">
+            <span className="text-green-400">$</span>
+            <input
+              type="text"
+              placeholder="Type a message..."
+              className="flex-1 bg-transparent text-gray-200 outline-none"
+              disabled={isSending}
+              onKeyDown={(e) => {
+                if (e.key === 'Enter') {
+                  handleSend(e.currentTarget.value)
+                  e.currentTarget.value = ''
+                }
+              }}
+            />
+          </div>
         </div>
       </DialogContent>
     </Dialog>
@@ -1210,6 +1201,7 @@ export default defineConfig({
 ## Migration Checklist
 
 ### Files to Create
+
 - [ ] `src/lib/api.ts`
 - [ ] `src/lib/queryClient.ts`
 - [ ] `src/lib/queryKeys.ts`
@@ -1219,6 +1211,7 @@ export default defineConfig({
 - [ ] `src/hooks/useWebSocket.ts`
 
 ### Files to Update
+
 - [ ] `src/hooks/useWorkspace.ts` - Replace mock with React Query
 - [ ] `src/pages/Index.tsx` - Use new hooks
 - [ ] `src/components/AgentBox.tsx` - Add data-testid, use real handlers
@@ -1228,9 +1221,11 @@ export default defineConfig({
 - [ ] `src/App.tsx` - Initialize WebSocket
 
 ### Files to Delete (after migration)
+
 - [ ] Mock data in `useWorkspace.ts`
 
 ### Testing
+
 - [ ] All existing UI interactions work
 - [ ] Data persists after refresh
 - [ ] Real-time updates appear

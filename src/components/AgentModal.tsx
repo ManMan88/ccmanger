@@ -2,25 +2,13 @@ import { useState, useEffect, useRef } from 'react'
 import type { Agent, AgentMode } from '@claude-manager/shared'
 import { useAgent } from '@/hooks/useAgents'
 import { useAgentSubscription, useWebSocket } from '@/hooks/useWebSocket'
+import { useTerminalOutput } from '@/hooks/useTerminalOutput'
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '@/components/ui/dialog'
 import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
-import { Textarea } from '@/components/ui/textarea'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import {
-  Send,
-  Zap,
-  ClipboardList,
-  Settings2,
-  X,
-  Edit2,
-  Check,
-  Loader2,
-  WifiOff,
-  Play,
-  Square,
-} from 'lucide-react'
+import { Zap, ClipboardList, Settings2, X, Edit2, Check, WifiOff, Play, Square } from 'lucide-react'
 
 interface AgentModalProps {
   agents: Agent[]
@@ -55,18 +43,19 @@ export function AgentModal({
   const [input, setInput] = useState('')
   const [editingAgentId, setEditingAgentId] = useState<string | null>(null)
   const [editedName, setEditedName] = useState('')
-  const scrollRef = useRef<HTMLDivElement>(null)
+  const terminalRef = useRef<HTMLDivElement>(null)
 
-  // Get agent data and messages from API
+  // Get agent data and actions from API
   const {
     agent: agentData,
-    messages,
     sendMessage,
     stopAgent,
     startAgent,
     isSending,
-    isLoading,
   } = useAgent(open ? selectedAgentId : null)
+
+  // Terminal output hook
+  const { lines, addUserInput } = useTerminalOutput(open ? selectedAgentId : null)
 
   // Subscribe to agent updates via WebSocket
   useAgentSubscription(open ? selectedAgentId : null)
@@ -77,12 +66,12 @@ export function AgentModal({
   // Find the agent from props (for display purposes before API data loads)
   const currentAgent = agentData || agents.find((a) => a.id === selectedAgentId)
 
-  // Scroll to bottom when messages change
+  // Auto-scroll to bottom when new output arrives
   useEffect(() => {
-    if (scrollRef.current) {
-      scrollRef.current.scrollTop = scrollRef.current.scrollHeight
+    if (terminalRef.current) {
+      terminalRef.current.scrollTop = terminalRef.current.scrollHeight
     }
-  }, [messages])
+  }, [lines])
 
   if (!currentAgent || agents.length === 0) return null
 
@@ -90,8 +79,20 @@ export function AgentModal({
 
   const handleSend = () => {
     if (!input.trim() || !currentAgent) return
-    sendMessage(input)
+
+    const message = input.trim()
     setInput('')
+
+    // Echo user input in terminal
+    addUserInput(message)
+
+    if (currentAgent.status === 'finished' || currentAgent.status === 'error') {
+      // Agent is idle — start it with the input as initial prompt
+      startAgent(message)
+    } else {
+      // Agent is running/waiting — write to stdin
+      sendMessage(message)
+    }
   }
 
   const handleStartEditing = (agent: Agent) => {
@@ -105,13 +106,6 @@ export function AgentModal({
       setEditingAgentId(null)
     }
   }
-
-  const formatTimestamp = (timestamp: string | Date) => {
-    const date = typeof timestamp === 'string' ? new Date(timestamp) : timestamp
-    return date.toLocaleTimeString()
-  }
-
-  const canSendMessage = currentAgent.status === 'running' || currentAgent.status === 'waiting'
 
   return (
     <Dialog open={open} onOpenChange={() => onClose()}>
@@ -190,17 +184,17 @@ export function AgentModal({
                   <Square className="h-3.5 w-3.5" />
                   Stop
                 </Button>
-              ) : currentAgent.status !== 'finished' ? (
+              ) : (
                 <Button
                   variant="outline"
                   size="sm"
-                  onClick={() => startAgent()}
+                  onClick={() => startAgent('continue')}
                   className="gap-1.5"
                 >
                   <Play className="h-3.5 w-3.5" />
                   Start
                 </Button>
-              ) : null}
+              )}
 
               <div className="flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1">
                 <ModeIcon className="h-3.5 w-3.5" />
@@ -214,84 +208,55 @@ export function AgentModal({
           </div>
         </DialogHeader>
 
-        {/* Chat Messages */}
-        <ScrollArea className="flex-1 p-6" ref={scrollRef}>
-          <div className="space-y-4">
-            {isLoading ? (
-              <div className="flex h-32 items-center justify-center">
-                <Loader2 className="h-6 w-6 animate-spin text-muted-foreground" />
+        {/* Terminal Output */}
+        <div
+          ref={terminalRef}
+          className="flex-1 overflow-y-auto bg-[#300a24] p-4 font-mono text-sm leading-relaxed"
+          data-testid="terminal-output"
+        >
+          {lines.length === 0 ? (
+            <div className="text-gray-500">
+              <p>Ready. Type a message below to start the agent.</p>
+            </div>
+          ) : (
+            lines.map((line) => (
+              <div
+                key={line.id}
+                className={
+                  line.type === 'user-input'
+                    ? 'text-green-400'
+                    : line.type === 'stderr'
+                      ? 'text-red-400'
+                      : line.type === 'system'
+                        ? 'italic text-yellow-500'
+                        : 'text-gray-200'
+                }
+              >
+                {line.type === 'user-input' ? `$ ${line.content}` : line.content}
               </div>
-            ) : messages.length === 0 ? (
-              <div className="py-8 text-center text-muted-foreground">
-                <p>No messages yet. Start the agent or send a message to begin.</p>
-              </div>
-            ) : (
-              messages.map((message) => (
-                <div
-                  key={message.id}
-                  className={`flex ${message.role === 'user' ? 'justify-end' : 'justify-start'}`}
-                  data-testid={`message-${message.id}`}
-                >
-                  <div
-                    className={`max-w-[80%] rounded-lg px-4 py-2 ${
-                      message.role === 'user'
-                        ? 'bg-primary text-primary-foreground'
-                        : message.role === 'system'
-                          ? 'border border-border bg-muted text-muted-foreground'
-                          : message.role === 'tool'
-                            ? 'border border-blue-500/20 bg-blue-500/10 font-mono text-xs text-blue-600 dark:text-blue-400'
-                            : 'bg-secondary text-secondary-foreground'
-                    }`}
-                  >
-                    {message.role === 'tool' && message.toolName && (
-                      <p className="mb-1 text-[10px] uppercase tracking-wider opacity-70">
-                        {message.toolName}
-                      </p>
-                    )}
-                    <p className="whitespace-pre-wrap text-sm">{message.content}</p>
-                    <p className="mt-1 text-xs opacity-60">{formatTimestamp(message.createdAt)}</p>
-                  </div>
-                </div>
-              ))
-            )}
-          </div>
-        </ScrollArea>
+            ))
+          )}
+        </div>
 
-        {/* Input Area */}
-        <div className="flex-shrink-0 border-t border-border p-4">
-          <div className="flex gap-2">
-            <Textarea
+        {/* Terminal Input */}
+        <div className="flex-shrink-0 border-t border-border bg-[#300a24] px-4 py-3">
+          <div className="flex items-center gap-2 font-mono">
+            <span className="select-none text-green-400">$</span>
+            <input
+              type="text"
               value={input}
               onChange={(e) => setInput(e.target.value)}
-              placeholder={
-                canSendMessage
-                  ? 'Type a message...'
-                  : currentAgent.status === 'finished'
-                    ? 'Agent has finished'
-                    : 'Start the agent to send messages'
-              }
-              className="min-h-[60px] resize-none"
-              disabled={!canSendMessage || isSending}
+              placeholder="Type a message..."
+              className="flex-1 border-none bg-transparent text-sm text-gray-200 outline-none placeholder:text-gray-600"
+              disabled={isSending}
               onKeyDown={(e) => {
-                if (e.key === 'Enter' && !e.shiftKey) {
+                if (e.key === 'Enter') {
                   e.preventDefault()
                   handleSend()
                 }
               }}
               data-testid="message-input"
             />
-            <Button
-              onClick={handleSend}
-              className="self-end"
-              disabled={!canSendMessage || isSending || !input.trim()}
-              data-testid="send-button"
-            >
-              {isSending ? (
-                <Loader2 className="h-4 w-4 animate-spin" />
-              ) : (
-                <Send className="h-4 w-4" />
-              )}
-            </Button>
           </div>
         </div>
       </DialogContent>

@@ -38,14 +38,14 @@ All errors follow a consistent format:
 
 ### Error Codes
 
-| Code | HTTP Status | Description |
-|------|-------------|-------------|
-| `VALIDATION_ERROR` | 400 | Invalid request data |
-| `NOT_FOUND` | 404 | Resource not found |
-| `CONFLICT` | 409 | Resource conflict (e.g., duplicate name) |
-| `INTERNAL_ERROR` | 500 | Server error |
-| `GIT_ERROR` | 500 | Git operation failed |
-| `PROCESS_ERROR` | 500 | Process management error |
+| Code               | HTTP Status | Description                              |
+| ------------------ | ----------- | ---------------------------------------- |
+| `VALIDATION_ERROR` | 400         | Invalid request data                     |
+| `NOT_FOUND`        | 404         | Resource not found                       |
+| `CONFLICT`         | 409         | Resource conflict (e.g., duplicate name) |
+| `INTERNAL_ERROR`   | 500         | Server error                             |
+| `GIT_ERROR`        | 500         | Git operation failed                     |
+| `PROCESS_ERROR`    | 500         | Process management error                 |
 
 ---
 
@@ -56,6 +56,7 @@ All errors follow a consistent format:
 List all workspaces.
 
 **Response 200:**
+
 ```json
 {
   "workspaces": [
@@ -77,6 +78,7 @@ List all workspaces.
 Get workspace details with all worktrees and agents.
 
 **Response 200:**
+
 ```json
 {
   "id": "ws_abc123",
@@ -116,6 +118,7 @@ Get workspace details with all worktrees and agents.
 Create or open a workspace from a git repository.
 
 **Request:**
+
 ```json
 {
   "path": "/home/user/projects/my-project"
@@ -123,6 +126,7 @@ Create or open a workspace from a git repository.
 ```
 
 **Response 201:**
+
 ```json
 {
   "id": "ws_abc123",
@@ -135,6 +139,7 @@ Create or open a workspace from a git repository.
 ```
 
 **Response 400:**
+
 ```json
 {
   "error": {
@@ -159,6 +164,7 @@ Close a workspace (does not delete files).
 List worktrees for a workspace.
 
 **Response 200:**
+
 ```json
 {
   "worktrees": [
@@ -180,6 +186,7 @@ List worktrees for a workspace.
 Create a new worktree.
 
 **Request:**
+
 ```json
 {
   "name": "feature-auth",
@@ -189,6 +196,7 @@ Create a new worktree.
 ```
 
 **Response 201:**
+
 ```json
 {
   "id": "wt_xyz123",
@@ -207,6 +215,7 @@ Create a new worktree.
 Update worktree settings.
 
 **Request:**
+
 ```json
 {
   "sortMode": "status",
@@ -215,6 +224,7 @@ Update worktree settings.
 ```
 
 **Response 200:**
+
 ```json
 {
   "id": "wt_def456",
@@ -231,6 +241,7 @@ Update worktree settings.
 Delete a worktree (removes git worktree and stops all agents).
 
 **Query Parameters:**
+
 - `force=true` - Force delete even with uncommitted changes
 
 **Response 204:** No content
@@ -240,6 +251,7 @@ Delete a worktree (removes git worktree and stops all agents).
 Checkout a different branch in the worktree.
 
 **Request:**
+
 ```json
 {
   "branch": "develop",
@@ -248,6 +260,7 @@ Checkout a different branch in the worktree.
 ```
 
 **Response 200:**
+
 ```json
 {
   "id": "wt_def456",
@@ -262,6 +275,7 @@ Checkout a different branch in the worktree.
 Reorder worktrees.
 
 **Request:**
+
 ```json
 {
   "worktreeIds": ["wt_xyz123", "wt_def456", "wt_abc789"]
@@ -269,6 +283,7 @@ Reorder worktrees.
 ```
 
 **Response 200:**
+
 ```json
 {
   "worktrees": [
@@ -288,11 +303,13 @@ Reorder worktrees.
 List all agents (optionally filtered).
 
 **Query Parameters:**
+
 - `worktreeId` - Filter by worktree
 - `status` - Filter by status (running|waiting|error|finished)
 - `includeDeleted` - Include previously deleted agents
 
 **Response 200:**
+
 ```json
 {
   "agents": [
@@ -317,6 +334,7 @@ List all agents (optionally filtered).
 Get agent details.
 
 **Response 200:**
+
 ```json
 {
   "id": "ag_ghi789",
@@ -339,6 +357,7 @@ Get agent details.
 Spawn a new agent.
 
 **Request:**
+
 ```json
 {
   "worktreeId": "wt_def456",
@@ -350,6 +369,7 @@ Spawn a new agent.
 ```
 
 **Response 201:**
+
 ```json
 {
   "id": "ag_new123",
@@ -371,6 +391,7 @@ Spawn a new agent.
 Update agent settings.
 
 **Request:**
+
 ```json
 {
   "name": "Updated Name",
@@ -380,6 +401,7 @@ Update agent settings.
 ```
 
 **Response 200:**
+
 ```json
 {
   "id": "ag_ghi789",
@@ -395,6 +417,7 @@ Update agent settings.
 Stop and delete an agent.
 
 **Query Parameters:**
+
 - `archive=true` - Keep in previousAgents list (default: true)
 
 **Response 204:** No content
@@ -404,6 +427,7 @@ Stop and delete an agent.
 Send a message to an agent.
 
 **Request:**
+
 ```json
 {
   "content": "Please also add unit tests for the changes"
@@ -411,6 +435,7 @@ Send a message to an agent.
 ```
 
 **Response 202:**
+
 ```json
 {
   "messageId": "msg_abc123",
@@ -423,6 +448,7 @@ Send a message to an agent.
 Stop a running agent (graceful).
 
 **Response 200:**
+
 ```json
 {
   "id": "ag_ghi789",
@@ -435,6 +461,7 @@ Stop a running agent (graceful).
 Resume a stopped agent.
 
 **Request:**
+
 ```json
 {
   "sessionId": "session_abc123"
@@ -442,6 +469,7 @@ Resume a stopped agent.
 ```
 
 **Response 200:**
+
 ```json
 {
   "id": "ag_ghi789",
@@ -455,6 +483,7 @@ Resume a stopped agent.
 Create a copy of an agent's session.
 
 **Request:**
+
 ```json
 {
   "name": "Forked Agent"
@@ -462,11 +491,12 @@ Create a copy of an agent's session.
 ```
 
 **Response 201:**
+
 ```json
 {
   "id": "ag_forked789",
   "name": "Forked Agent",
-  "status": "waiting",
+  "status": "finished",
   "contextLevel": 67,
   "mode": "auto",
   "permissions": ["read", "write", "execute"],
@@ -481,6 +511,7 @@ Create a copy of an agent's session.
 Reorder agents within a worktree.
 
 **Request:**
+
 ```json
 {
   "worktreeId": "wt_def456",
@@ -489,6 +520,7 @@ Reorder agents within a worktree.
 ```
 
 **Response 200:**
+
 ```json
 {
   "agents": [
@@ -504,10 +536,12 @@ Reorder agents within a worktree.
 Get message history for an agent.
 
 **Query Parameters:**
+
 - `limit` - Number of messages (default: 100)
 - `before` - Cursor for pagination
 
 **Response 200:**
+
 ```json
 {
   "messages": [
@@ -538,6 +572,7 @@ Get message history for an agent.
 Get current usage statistics.
 
 **Response 200:**
+
 ```json
 {
   "daily": {
@@ -563,11 +598,13 @@ Get current usage statistics.
 Get usage history.
 
 **Query Parameters:**
+
 - `period` - daily|weekly|monthly
 - `start` - Start date (ISO 8601)
 - `end` - End date (ISO 8601)
 
 **Response 200:**
+
 ```json
 {
   "history": [
@@ -790,26 +827,26 @@ export const AgentSortMode = z.enum(['free', 'status', 'name'])
 export const Permission = z.enum(['read', 'write', 'execute'])
 
 export const CreateWorkspaceSchema = z.object({
-  path: z.string().min(1).refine(
-    (path) => path.startsWith('/'),
-    'Path must be absolute'
-  )
+  path: z
+    .string()
+    .min(1)
+    .refine((path) => path.startsWith('/'), 'Path must be absolute'),
 })
 
 export const CreateWorktreeSchema = z.object({
   name: z.string().min(1).max(50),
   branch: z.string().min(1).max(100),
-  createBranch: z.boolean().optional().default(false)
+  createBranch: z.boolean().optional().default(false),
 })
 
 export const UpdateWorktreeSchema = z.object({
   sortMode: AgentSortMode.optional(),
-  order: z.number().int().min(0).optional()
+  order: z.number().int().min(0).optional(),
 })
 
 export const CheckoutBranchSchema = z.object({
   branch: z.string().min(1).max(100),
-  createBranch: z.boolean().optional().default(false)
+  createBranch: z.boolean().optional().default(false),
 })
 
 export const CreateAgentSchema = z.object({
@@ -817,30 +854,30 @@ export const CreateAgentSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   mode: AgentMode.optional().default('regular'),
   permissions: z.array(Permission).optional().default(['read']),
-  initialPrompt: z.string().optional()
+  initialPrompt: z.string().optional(),
 })
 
 export const UpdateAgentSchema = z.object({
   name: z.string().min(1).max(100).optional(),
   mode: AgentMode.optional(),
-  permissions: z.array(Permission).optional()
+  permissions: z.array(Permission).optional(),
 })
 
 export const SendMessageSchema = z.object({
-  content: z.string().min(1).max(50000)
+  content: z.string().min(1).max(50000),
 })
 
 export const ReorderAgentsSchema = z.object({
   worktreeId: z.string().min(1),
-  agentIds: z.array(z.string()).min(1)
+  agentIds: z.array(z.string()).min(1),
 })
 
 export const ReorderWorktreesSchema = z.object({
-  worktreeIds: z.array(z.string()).min(1)
+  worktreeIds: z.array(z.string()).min(1),
 })
 
 export const ForkAgentSchema = z.object({
-  name: z.string().min(1).max(100).optional()
+  name: z.string().min(1).max(100).optional(),
 })
 ```
 
@@ -848,12 +885,12 @@ export const ForkAgentSchema = z.object({
 
 ## Rate Limiting
 
-| Endpoint Pattern | Limit | Window |
-|------------------|-------|--------|
-| `POST /api/agents` | 10 | 1 minute |
-| `POST /api/agents/:id/message` | 60 | 1 minute |
-| `* /api/*` | 1000 | 1 minute |
-| WebSocket connections | 10 | per client |
+| Endpoint Pattern               | Limit | Window     |
+| ------------------------------ | ----- | ---------- |
+| `POST /api/agents`             | 10    | 1 minute   |
+| `POST /api/agents/:id/message` | 60    | 1 minute   |
+| `* /api/*`                     | 1000  | 1 minute   |
+| WebSocket connections          | 10    | per client |
 
 ---
 
@@ -864,6 +901,7 @@ Current version: `v1` (implicit)
 Future versions will use URL prefix: `/api/v2/...`
 
 Deprecation notices will be sent via response header:
+
 ```
 X-API-Deprecation: This endpoint will be removed on 2025-06-01. Use /api/v2/... instead.
 ```

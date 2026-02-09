@@ -786,7 +786,7 @@ export class ProcessManager extends EventEmitter {
     if (force) {
       proc.process.kill('SIGKILL')
     } else {
-      proc.process.kill('SIGTERM')
+      proc.process.kill('SIGINT')
     }
 
     logger.info({ agentId, force }, 'Agent stop signal sent')
@@ -821,7 +821,11 @@ export function getProcessManager(): ProcessManager {
 
 ```typescript
 // server/src/services/agent.service.ts
-import { AgentRepository, CreateAgentDto, UpdateAgentDto } from '../db/repositories/agent.repository.js'
+import {
+  AgentRepository,
+  CreateAgentDto,
+  UpdateAgentDto,
+} from '../db/repositories/agent.repository.js'
 import { MessageRepository } from '../db/repositories/message.repository.js'
 import { ProcessManager, getProcessManager } from './process.service.js'
 import { WorktreeRepository } from '../db/repositories/worktree.repository.js'
@@ -875,10 +879,11 @@ export class AgentService extends EventEmitter {
       this.emit('agent:context', agentId, level)
     })
 
-    this.processManager.on('agent:exit', (agentId, code) => {
-      const status = code === 0 ? 'finished' : 'error'
+    this.processManager.on('agent:exit', (agentId, _code) => {
+      // Agent exit always returns to idle (finished) state.
+      // DB status is synced by the process event listener in main.rs.
       this.agentRepo.update(agentId, {
-        status,
+        status: 'finished',
         pid: null,
       })
     })
@@ -1393,11 +1398,7 @@ export function createContainer(db: Database.Database): Container {
 
   // Services
   const services = {
-    agent: new AgentService(
-      repositories.agent,
-      repositories.message,
-      repositories.worktree
-    ),
+    agent: new AgentService(repositories.agent, repositories.message, repositories.worktree),
     workspace: new WorkspaceService(repositories.workspace, repositories.worktree),
     worktree: new WorktreeService(repositories.worktree, repositories.agent),
   }

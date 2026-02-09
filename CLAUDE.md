@@ -220,7 +220,7 @@ Test infrastructure includes:
 - **Running** (green): Agent actively processing
 - **Waiting** (yellow/orange): Awaiting user input
 - **Error** (red): Agent encountered an error
-- **Finished** (gray): Agent completed
+- **Finished/Idle** (gray): Agent is idle and available for new tasks
 
 ## Documentation
 

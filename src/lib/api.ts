@@ -492,9 +492,9 @@ export const api = {
     },
 
     // Process control
-    start: async (id: string, worktreePath: string, initialPrompt?: string) => {
+    start: async (id: string, initialPrompt?: string) => {
       if (isTauri) {
-        return tauriInvoke<Agent>('start_agent', { id, worktreePath, initialPrompt })
+        return tauriInvoke<Agent>('start_agent', { id, initialPrompt })
       }
       return request<Agent>(`/api/agents/${id}/start`, {
         method: 'POST',

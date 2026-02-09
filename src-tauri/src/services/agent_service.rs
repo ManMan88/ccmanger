@@ -150,9 +150,14 @@ impl AgentService {
     pub fn stop_agent(&self, id: &str, force: bool) -> Result<Agent, AgentError> {
         self.process_manager.stop_agent(id, force)?;
 
-        self.agent_repo
-            .update_status(id, AgentStatus::Finished, None)
-            .map_err(|e| AgentError::Database(e.to_string()))?;
+        if force {
+            // For force stop, update DB immediately since process is killed
+            self.agent_repo
+                .update_status(id, AgentStatus::Finished, None)
+                .map_err(|e| AgentError::Database(e.to_string()))?;
+        }
+        // For graceful stop (SIGINT), the DB status sync task in main.rs
+        // will update when the process actually exits
 
         self.get_agent(id)
     }

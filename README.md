@@ -194,17 +194,17 @@ claude-manager/
 
 1. Click **"+"** in a worktree to create a new agent
 2. Enter a name and configure mode/permissions
-3. Click on an agent card to open the chat interface
-4. Send messages and receive real-time responses
+3. Click on an agent card to open the terminal interface
+4. Type commands and see real-time CLI output
 
 ### Agent Status
 
-| Color  | Status   | Description                  |
-| ------ | -------- | ---------------------------- |
-| Green  | Running  | Agent is actively processing |
-| Yellow | Waiting  | Agent awaits user input      |
-| Red    | Error    | Agent encountered an error   |
-| Gray   | Finished | Agent completed its task     |
+| Color  | Status  | Description                           |
+| ------ | ------- | ------------------------------------- |
+| Green  | Running | Agent is actively processing          |
+| Yellow | Waiting | Agent awaits user input               |
+| Red    | Error   | Agent encountered an error            |
+| Gray   | Idle    | Agent is idle and available for tasks |
 
 ---
 

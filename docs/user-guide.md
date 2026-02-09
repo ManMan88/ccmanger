@@ -143,12 +143,12 @@ Agents are instances of Claude Code CLI that can help you with coding tasks.
 
 ### Agent Status
 
-| Status       | Color  | Meaning                         |
-| ------------ | ------ | ------------------------------- |
-| **Running**  | Green  | Agent is actively processing    |
-| **Waiting**  | Yellow | Agent is waiting for user input |
-| **Error**    | Red    | Agent encountered an error      |
-| **Finished** | Gray   | Agent has completed its task    |
+| Status      | Color  | Meaning                               |
+| ----------- | ------ | ------------------------------------- |
+| **Running** | Green  | Agent is actively processing          |
+| **Waiting** | Yellow | Agent is waiting for user input       |
+| **Error**   | Red    | Agent encountered an error            |
+| **Idle**    | Gray   | Agent is idle and available for tasks |
 
 ### Context Level
 
@@ -160,11 +160,12 @@ The context level indicator shows how much of the agent's context window is bein
 
 ### Interacting with Agents
 
-1. Click on an agent card to open the chat interface
-2. Type your message in the input field
-3. Press Enter or click Send
+1. Click on an agent card to open the terminal interface
+2. Type your message in the input field and press Enter
+3. If the agent is idle, your message starts the agent with that prompt
+4. If the agent is running, your message is sent to the agent's stdin
 
-Messages are streamed in real-time, so you'll see the response as it's being generated.
+Output streams in real-time in a terminal-style display (dark background, monospace font). The input is always enabled regardless of agent status.
 
 ### Agent Actions
 
@@ -245,15 +246,14 @@ Click on the usage bar to see:
 
 ## Keyboard Shortcuts
 
-| Shortcut        | Action                        |
-| --------------- | ----------------------------- |
-| `Cmd/Ctrl + K`  | Open command palette          |
-| `Cmd/Ctrl + N`  | New agent in current worktree |
-| `Cmd/Ctrl + O`  | Open workspace                |
-| `Cmd/Ctrl + W`  | Close current modal           |
-| `Enter`         | Send message (in chat)        |
-| `Shift + Enter` | New line in message           |
-| `Escape`        | Cancel / Close modal          |
+| Shortcut       | Action                        |
+| -------------- | ----------------------------- |
+| `Cmd/Ctrl + K` | Open command palette          |
+| `Cmd/Ctrl + N` | New agent in current worktree |
+| `Cmd/Ctrl + O` | Open workspace                |
+| `Cmd/Ctrl + W` | Close current modal           |
+| `Enter`        | Send message (in terminal)    |
+| `Escape`       | Cancel / Close modal          |
 
 ---
 

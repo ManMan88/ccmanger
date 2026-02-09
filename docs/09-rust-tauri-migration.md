@@ -881,7 +881,6 @@ pub enum ProcessEvent {
 pub struct AgentProcess {
     pub pid: u32,
     child: Child,
-    output_buffer: String,
 }
 
 pub struct ProcessManager {
@@ -971,7 +970,6 @@ impl ProcessManager {
         let process = AgentProcess {
             pid,
             child,
-            output_buffer: String::new(),
         };
 
         self.processes.write().insert(agent_id.to_string(), process);
@@ -1015,7 +1013,7 @@ impl ProcessManager {
             {
                 use std::os::unix::process::CommandExt;
                 unsafe {
-                    libc::kill(process.pid as i32, libc::SIGTERM);
+                    libc::kill(process.pid as i32, libc::SIGINT);
                 }
             }
             #[cfg(windows)]

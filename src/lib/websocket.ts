@@ -255,31 +255,9 @@ class WebSocketClient {
     }
   }
 
-  private handleAgentOutput(payload: AgentOutputPayload): void {
-    // Append message to agent's message cache
-    const currentData = queryClient.getQueryData<{ messages: Message[]; hasMore: boolean }>(
-      queryKeys.agents.messages(payload.agentId)
-    )
-
-    if (currentData) {
-      const newMessage: Message = {
-        id: `msg_${Date.now()}`,
-        agentId: payload.agentId,
-        role: payload.role || 'assistant',
-        content: payload.content,
-        tokenCount: null,
-        toolName: null,
-        toolInput: null,
-        toolOutput: null,
-        createdAt: new Date().toISOString(),
-        isComplete: payload.isComplete ?? true,
-      }
-
-      queryClient.setQueryData(queryKeys.agents.messages(payload.agentId), {
-        ...currentData,
-        messages: [...currentData.messages, newMessage],
-      })
-    }
+  private handleAgentOutput(_payload: AgentOutputPayload): void {
+    // Output is now handled by the useTerminalOutput hook via generic event handlers.
+    // No longer creating Message objects in the React Query cache.
   }
 
   private handleAgentStatus(payload: AgentStatusPayload): void {

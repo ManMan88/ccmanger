@@ -46,7 +46,7 @@ const statusLabels: Record<AgentStatus, string> = {
   running: 'Running',
   waiting: 'Waiting for input',
   error: 'Error',
-  finished: 'Finished',
+  finished: 'Idle',
 }
 
 const modeIcons: Record<AgentMode, typeof Zap> = {
@@ -96,8 +96,8 @@ export function AgentBox({
       } else {
         onUpdateStatus('waiting')
       }
-    } else if (agent.status !== 'finished') {
-      if (onStart && agent.status !== 'waiting') {
+    } else {
+      if (onStart) {
         onStart()
       } else {
         onUpdateStatus('running')
@@ -171,7 +171,7 @@ export function AgentBox({
             </TooltipTrigger>
             <TooltipContent>Stop</TooltipContent>
           </Tooltip>
-        ) : agent.status !== 'finished' ? (
+        ) : (
           <Tooltip>
             <TooltipTrigger asChild>
               <Button
@@ -180,14 +180,14 @@ export function AgentBox({
                 className="h-7 w-7"
                 onClick={handlePlayPause}
                 data-testid={`agent-play-${agent.id}`}
-                aria-label={agent.status === 'waiting' ? 'Resume agent' : 'Start agent'}
+                aria-label="Start agent"
               >
                 <Play className="h-3.5 w-3.5" aria-hidden="true" />
               </Button>
             </TooltipTrigger>
-            <TooltipContent>{agent.status === 'waiting' ? 'Resume' : 'Start'}</TooltipContent>
+            <TooltipContent>Start</TooltipContent>
           </Tooltip>
-        ) : null}
+        )}
 
         <DropdownMenu>
           <Tooltip>

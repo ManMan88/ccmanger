@@ -81,13 +81,14 @@ pub async fn delete_agent(
 #[tauri::command]
 pub async fn start_agent(
     id: String,
-    worktree_path: String,
     initial_prompt: Option<String>,
     state: State<'_, AppState>,
 ) -> Result<Agent, String> {
+    let agent = state.agent_service.get_agent(&id).map_err(|e| e.to_string())?;
+    let worktree = state.worktree_service.get_worktree(&agent.worktree_id).map_err(|e| e.to_string())?;
     state
         .agent_service
-        .start_agent(&id, &worktree_path, initial_prompt.as_deref())
+        .start_agent(&id, &worktree.path, initial_prompt.as_deref())
         .map_err(|e| e.to_string())
 }
 

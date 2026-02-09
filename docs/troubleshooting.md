@@ -123,8 +123,8 @@ pnpm --version
 
 **Symptoms:**
 
-- Agent stays in "finished" or "error" status
-- No output appears
+- Agent stays in "idle" or "error" status after clicking Start
+- No output appears in the terminal
 
 **Solutions:**
 
