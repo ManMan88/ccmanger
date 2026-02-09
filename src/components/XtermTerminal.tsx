@@ -5,14 +5,15 @@ import '@xterm/xterm/css/xterm.css'
 
 interface XtermTerminalProps {
   agentId: string
-  isRunning: boolean
+  isActive: boolean
 }
 
-export function XtermTerminal({ agentId, isRunning }: XtermTerminalProps) {
+export function XtermTerminal({ agentId, isActive }: XtermTerminalProps) {
   const containerRef = useRef<HTMLDivElement>(null)
   const terminalRef = useRef<Terminal | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
+  const intentionalCloseRef = useRef(false)
 
   // Create xterm.js terminal once
   useEffect(() => {
@@ -48,9 +49,11 @@ export function XtermTerminal({ agentId, isRunning }: XtermTerminalProps) {
     }
   }, [])
 
-  // Connect PTY WebSocket when agent is running
+  // Connect PTY WebSocket when agent process is alive
   useEffect(() => {
-    if (!isRunning || !terminalRef.current) return
+    if (!isActive || !terminalRef.current) return
+
+    intentionalCloseRef.current = false
 
     const ws = new WebSocket(`ws://127.0.0.1:3001/ws/pty/${agentId}`)
     ws.binaryType = 'arraybuffer'
@@ -84,20 +87,25 @@ export function XtermTerminal({ agentId, isRunning }: XtermTerminalProps) {
     }
 
     ws.onerror = () => {
-      terminal.writeln('\r\n\x1b[31m[WebSocket connection error]\x1b[0m')
+      if (!intentionalCloseRef.current) {
+        terminal.writeln('\r\n\x1b[31m[WebSocket connection error]\x1b[0m')
+      }
     }
 
     ws.onclose = () => {
-      terminal.writeln('\r\n\x1b[33m[Session ended]\x1b[0m')
+      if (!intentionalCloseRef.current) {
+        terminal.writeln('\r\n\x1b[33m[Session ended]\x1b[0m')
+      }
     }
 
     return () => {
       onData.dispose()
       onResize.dispose()
+      intentionalCloseRef.current = true
       ws.close()
       wsRef.current = null
     }
-  }, [agentId, isRunning])
+  }, [agentId, isActive])
 
   return <div ref={containerRef} className="h-full w-full" />
 }

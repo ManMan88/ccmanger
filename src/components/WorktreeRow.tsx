@@ -67,7 +67,7 @@ const statusOrder: Record<AgentStatus, number> = {
   running: 0,
   waiting: 1,
   error: 2,
-  finished: 3,
+  idle: 3,
 }
 
 export function WorktreeRow({

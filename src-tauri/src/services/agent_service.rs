@@ -58,7 +58,7 @@ impl AgentService {
             ),
             worktree_id: worktree_id.to_string(),
             name: agent_name,
-            status: AgentStatus::Finished,
+            status: AgentStatus::Idle,
             context_level: 0,
             mode,
             permissions,
@@ -153,7 +153,7 @@ impl AgentService {
         if force {
             // For force stop, update DB immediately since process is killed
             self.agent_repo
-                .update_status(id, AgentStatus::Finished, None)
+                .update_status(id, AgentStatus::Idle, None)
                 .map_err(|e| AgentError::Database(e.to_string()))?;
         }
         // For graceful stop (SIGINT), the DB status sync task in main.rs
@@ -231,7 +231,7 @@ impl AgentService {
             ),
             name: name.unwrap_or_else(|| format!("{} (fork)", parent.name)),
             parent_agent_id: Some(parent.id.clone()),
-            status: AgentStatus::Finished,
+            status: AgentStatus::Idle,
             pid: None,
             session_id: parent.session_id.clone(),
             worktree_id: parent.worktree_id,
@@ -383,7 +383,7 @@ mod tests {
 
         assert_eq!(agent.name, "Test Agent");
         assert_eq!(agent.mode, AgentMode::Regular);
-        assert_eq!(agent.status, AgentStatus::Finished);
+        assert_eq!(agent.status, AgentStatus::Idle);
         assert!(agent.id.starts_with("ag_"));
     }
 

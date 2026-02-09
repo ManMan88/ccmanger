@@ -86,7 +86,7 @@ export interface AgentSessionRow {
 }
 
 // Enums and union types
-export type AgentStatus = 'running' | 'waiting' | 'error' | 'finished'
+export type AgentStatus = 'running' | 'waiting' | 'error' | 'idle'
 export type AgentMode = 'auto' | 'plan' | 'regular'
 export type MessageRole = 'user' | 'assistant' | 'system' | 'tool'
 export type UsagePeriod = 'daily' | 'weekly' | 'monthly'

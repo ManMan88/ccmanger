@@ -1,8 +1,8 @@
+@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
+
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
-
-@import url('https://fonts.googleapis.com/css2?family=JetBrains+Mono:wght@400;500;600&family=Inter:wght@400;500;600;700&display=swap');
 
 @layer base {
   :root {
@@ -40,7 +40,7 @@
     --status-running: 142 76% 45%;
     --status-waiting: 38 92% 55%;
     --status-error: 0 84% 60%;
-    --status-finished: 240 5% 50%;
+    --status-idle: 240 5% 50%;
 
     /* Agent box */
     --agent-bg: 0 0% 96%;
@@ -101,7 +101,7 @@
     --status-running: 142 76% 45%;
     --status-waiting: 38 92% 55%;
     --status-error: 0 72% 55%;
-    --status-finished: 240 5% 45%;
+    --status-idle: 240 5% 45%;
 
     /* Agent box */
     --agent-bg: 240 6% 12%;
@@ -136,7 +136,7 @@
   }
 
   body {
-    @apply bg-background text-foreground font-sans antialiased;
+    @apply bg-background font-sans text-foreground antialiased;
     font-family: 'Inter', system-ui, sans-serif;
   }
 
@@ -147,9 +147,9 @@
 
 @layer components {
   .agent-box {
-    @apply relative rounded-lg p-3 transition-all duration-200 cursor-pointer;
-    @apply bg-agent border-2;
-    @apply hover:shadow-lg hover:scale-[1.02];
+    @apply relative cursor-pointer rounded-lg p-3 transition-all duration-200;
+    @apply border-2 bg-agent;
+    @apply hover:scale-[1.02] hover:shadow-lg;
   }
 
   .agent-box-running {
@@ -167,41 +167,41 @@
     box-shadow: 0 0 12px hsl(var(--status-error) / 0.3);
   }
 
-  .agent-box-finished {
-    @apply border-status-finished;
+  .agent-box-idle {
+    @apply border-status-idle;
   }
 
   .worktree-row {
-    @apply rounded-xl overflow-hidden;
-    @apply bg-worktree border border-border;
+    @apply overflow-hidden rounded-xl;
+    @apply border border-border bg-worktree;
   }
 
   .worktree-header {
-    @apply px-4 py-3 flex items-center justify-between;
-    @apply bg-worktree-header border-b border-border;
+    @apply flex items-center justify-between px-4 py-3;
+    @apply border-b border-border bg-worktree-header;
   }
 
   .toolbar {
-    @apply h-14 px-4 flex items-center justify-between;
-    @apply bg-toolbar border-b border-toolbar-border;
+    @apply flex h-14 items-center justify-between px-4;
+    @apply border-b border-toolbar-border bg-toolbar;
   }
 
   .usage-bar {
-    @apply h-10 px-4 flex items-center justify-between;
-    @apply bg-usage border-t border-border;
+    @apply flex h-10 items-center justify-between px-4;
+    @apply border-t border-border bg-usage;
   }
 
   .context-indicator {
-    @apply text-xs font-mono px-2 py-0.5 rounded-full;
+    @apply rounded-full px-2 py-0.5 font-mono text-xs;
     @apply bg-muted text-muted-foreground;
   }
 
   .status-dot {
-    @apply w-2 h-2 rounded-full;
+    @apply h-2 w-2 rounded-full;
   }
 
   .status-dot-running {
-    @apply bg-status-running animate-pulse;
+    @apply animate-pulse bg-status-running;
   }
 
   .status-dot-waiting {
@@ -212,8 +212,8 @@
     @apply bg-status-error;
   }
 
-  .status-dot-finished {
-    @apply bg-status-finished;
+  .status-dot-idle {
+    @apply bg-status-idle;
   }
 }
 

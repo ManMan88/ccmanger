@@ -204,7 +204,7 @@ impl std::error::Error for MockProcessError {}
 /// Helper trait for asserting agent states
 pub trait AgentAssertions {
     fn assert_running(&self);
-    fn assert_finished(&self);
+    fn assert_idle(&self);
     fn assert_waiting(&self);
     fn assert_error(&self);
     fn assert_has_name(&self, name: &str);
@@ -216,8 +216,8 @@ impl AgentAssertions for Agent {
         assert_eq!(self.status, AgentStatus::Running, "Expected agent to be running");
     }
 
-    fn assert_finished(&self) {
-        assert_eq!(self.status, AgentStatus::Finished, "Expected agent to be finished");
+    fn assert_idle(&self) {
+        assert_eq!(self.status, AgentStatus::Idle, "Expected agent to be idle");
     }
 
     fn assert_waiting(&self) {

@@ -263,7 +263,7 @@ impl AgentRepository {
         conn.execute(
             r#"
             UPDATE agents
-            SET pid = NULL, status = 'finished', updated_at = datetime('now')
+            SET pid = NULL, status = 'idle', updated_at = datetime('now')
             WHERE pid IS NOT NULL
         "#,
             [],
@@ -415,7 +415,7 @@ mod tests {
             id: format!("ag_{}", uuid::Uuid::new_v4()),
             worktree_id: worktree_id.to_string(),
             name: "Test Agent".to_string(),
-            status: AgentStatus::Finished,
+            status: AgentStatus::Idle,
             context_level: 0,
             mode: AgentMode::Regular,
             permissions: vec![Permission::Read],
@@ -443,7 +443,7 @@ mod tests {
 
         assert_eq!(created.id, agent.id);
         assert_eq!(created.name, "Test Agent");
-        assert_eq!(created.status, AgentStatus::Finished);
+        assert_eq!(created.status, AgentStatus::Idle);
         assert_eq!(created.mode, AgentMode::Regular);
     }
 
@@ -601,7 +601,7 @@ mod tests {
         repo.clear_running_pids().unwrap();
 
         let updated = repo.find_by_id(&agent.id).unwrap().unwrap();
-        assert_eq!(updated.status, AgentStatus::Finished);
+        assert_eq!(updated.status, AgentStatus::Idle);
         assert!(updated.pid.is_none());
     }
 }

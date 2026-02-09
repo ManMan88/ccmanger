@@ -72,7 +72,7 @@ export default {
           running: 'hsl(var(--status-running))',
           waiting: 'hsl(var(--status-waiting))',
           error: 'hsl(var(--status-error))',
-          finished: 'hsl(var(--status-finished))',
+          idle: 'hsl(var(--status-idle))',
         },
         // Component backgrounds
         agent: 'hsl(var(--agent-bg))',

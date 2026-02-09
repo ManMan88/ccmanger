@@ -19,11 +19,18 @@ pub fn run_migrations(conn: &Connection) -> DbResult<()> {
         [],
     )?;
 
-    let migrations = vec![(
-        1,
-        "initial_schema",
-        include_str!("migrations/001_initial_schema.sql"),
-    )];
+    let migrations = vec![
+        (
+            1,
+            "initial_schema",
+            include_str!("migrations/001_initial_schema.sql"),
+        ),
+        (
+            2,
+            "rename_finished_to_idle",
+            include_str!("migrations/002_rename_finished_to_idle.sql"),
+        ),
+    ];
 
     for (version, name, sql) in migrations {
         let applied: bool = conn

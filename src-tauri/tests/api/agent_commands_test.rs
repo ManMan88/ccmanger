@@ -31,7 +31,7 @@ fn test_agent_crud() {
 
     assert!(created.id.starts_with("ag_"));
     assert_eq!(created.name, "Test Agent");
-    assert_eq!(created.status, AgentStatus::Finished);
+    assert_eq!(created.status, AgentStatus::Idle);
     assert_eq!(created.mode, AgentMode::Regular);
     assert_eq!(created.permissions, vec![Permission::Read]);
 

@@ -90,7 +90,7 @@ fn main() {
                         services::ProcessEvent::Exit { ref agent_id, .. } => {
                             if let Err(e) = db_sync_repo.update_status(
                                 agent_id,
-                                claude_manager_lib::types::AgentStatus::Finished,
+                                claude_manager_lib::types::AgentStatus::Idle,
                                 None,
                             ) {
                                 tracing::warn!("Failed to sync exit status for {}: {}", agent_id, e);

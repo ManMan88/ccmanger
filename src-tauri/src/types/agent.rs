@@ -10,7 +10,7 @@ pub enum AgentStatus {
     Waiting,
     Error,
     #[default]
-    Finished,
+    Idle,
 }
 
 impl AgentStatus {
@@ -19,7 +19,7 @@ impl AgentStatus {
             AgentStatus::Running => "running",
             AgentStatus::Waiting => "waiting",
             AgentStatus::Error => "error",
-            AgentStatus::Finished => "finished",
+            AgentStatus::Idle => "idle",
         }
     }
 
@@ -28,7 +28,8 @@ impl AgentStatus {
             "running" => AgentStatus::Running,
             "waiting" => AgentStatus::Waiting,
             "error" => AgentStatus::Error,
-            _ => AgentStatus::Finished,
+            "idle" | "finished" => AgentStatus::Idle,
+            _ => AgentStatus::Idle,
         }
     }
 }

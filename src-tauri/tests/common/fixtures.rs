@@ -67,7 +67,7 @@ pub fn create_agent(worktree_id: &str) -> Agent {
         ),
         worktree_id: worktree_id.to_string(),
         name: "Test Agent".to_string(),
-        status: AgentStatus::Finished,
+        status: AgentStatus::Idle,
         context_level: 0,
         mode: AgentMode::Regular,
         permissions: vec![Permission::Read],

@@ -281,8 +281,8 @@ async fn pty_ws_handler(
 async fn handle_pty_socket(socket: WebSocket, agent_id: String, state: Arc<WsState>) {
     let (mut ws_sender, mut ws_receiver) = socket.split();
 
-    // Get PTY channels from ProcessManager
-    let pty_data = state.process_manager.take_pty_output_rx(&agent_id);
+    // Subscribe to PTY output (broadcast — multiple subscribers OK)
+    let pty_data = state.process_manager.subscribe_pty_output(&agent_id);
     let input_tx = state.process_manager.get_pty_input_tx(&agent_id);
 
     let (mut output_rx, buffer) = match pty_data {
@@ -317,15 +317,24 @@ async fn handle_pty_socket(socket: WebSocket, agent_id: String, state: Arc<WsSta
         }
     }
 
-    // Task: PTY output → WebSocket binary frames
+    // Task: PTY output → WebSocket binary frames (broadcast receiver)
     let send_task = tokio::spawn(async move {
-        while let Some(bytes) = output_rx.recv().await {
-            if ws_sender
-                .send(Message::Binary(bytes))
-                .await
-                .is_err()
-            {
-                break;
+        loop {
+            match output_rx.recv().await {
+                Ok(bytes) => {
+                    if ws_sender
+                        .send(Message::Binary(bytes))
+                        .await
+                        .is_err()
+                    {
+                        break;
+                    }
+                }
+                Err(broadcast::error::RecvError::Lagged(n)) => {
+                    tracing::debug!("PTY WebSocket lagged by {} messages, continuing", n);
+                    continue;
+                }
+                Err(broadcast::error::RecvError::Closed) => break,
             }
         }
     });

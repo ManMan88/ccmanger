@@ -1,4 +1,4 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import type { Agent, AgentMode } from '@claude-manager/shared'
 import { useAgent } from '@/hooks/useAgents'
 import { useAgentSubscription, useWebSocket } from '@/hooks/useWebSocket'
@@ -29,7 +29,7 @@ const statusClasses = {
   running: 'bg-status-running',
   waiting: 'bg-status-waiting',
   error: 'bg-status-error',
-  finished: 'bg-status-finished',
+  idle: 'bg-status-idle',
 }
 
 export function AgentModal({
@@ -44,7 +44,12 @@ export function AgentModal({
   const [editedName, setEditedName] = useState('')
 
   // Get agent data and actions from API
-  const { agent: agentData, stopAgent, startAgent } = useAgent(open ? selectedAgentId : null)
+  const {
+    agent: agentData,
+    stopAgent,
+    startAgent,
+    isStarting,
+  } = useAgent(open ? selectedAgentId : null)
 
   // Subscribe to agent updates via WebSocket
   useAgentSubscription(open ? selectedAgentId : null)
@@ -54,6 +59,13 @@ export function AgentModal({
 
   // Find the agent from props (for display purposes before API data loads)
   const currentAgent = agentData || agents.find((a) => a.id === selectedAgentId)
+
+  // Auto-start agent when modal opens and agent is idle with no process
+  useEffect(() => {
+    if (open && currentAgent?.status === 'idle' && !currentAgent?.pid && !isStarting) {
+      startAgent()
+    }
+  }, [open, currentAgent?.status])
 
   if (!currentAgent || agents.length === 0) return null
 
@@ -143,7 +155,7 @@ export function AgentModal({
             </div>
             <div className="flex items-center gap-3">
               {/* Start/Stop Button */}
-              {currentAgent.status === 'running' ? (
+              {currentAgent.pid ? (
                 <Button variant="outline" size="sm" onClick={() => stopAgent()} className="gap-1.5">
                   <Square className="h-3.5 w-3.5" />
                   Stop
@@ -175,10 +187,7 @@ export function AgentModal({
         {/* Terminal - xterm.js */}
         <div className="flex-1 overflow-hidden bg-[#300a24]" data-testid="terminal-output">
           {currentAgent ? (
-            <XtermTerminal
-              agentId={currentAgent.id}
-              isRunning={currentAgent.status === 'running'}
-            />
+            <XtermTerminal agentId={currentAgent.id} isActive={!!currentAgent.pid} />
           ) : (
             <div className="p-4 text-gray-500">Select an agent to begin.</div>
           )}

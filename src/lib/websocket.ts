@@ -215,7 +215,7 @@ class WebSocketClient {
     const p = payload as Record<string, unknown>
     return {
       agentId: (p.agentId as string) || '',
-      status: (p.status as AgentStatus) || 'finished',
+      status: (p.status as AgentStatus) || 'idle',
     }
   }
 
@@ -323,9 +323,9 @@ class WebSocketClient {
   private handleAgentTerminated(payload: AgentTerminatedPayload): void {
     console.log('Agent terminated:', payload.agentId, 'exit code:', payload.exitCode)
 
-    // Update agent status to finished
+    // Update agent status to idle
     queryClient.setQueryData<Agent>(queryKeys.agents.detail(payload.agentId), (old) =>
-      old ? { ...old, status: 'finished' as AgentStatus, pid: null } : old
+      old ? { ...old, status: 'idle' as AgentStatus, pid: null } : old
     )
 
     // Invalidate workspace to get updated data

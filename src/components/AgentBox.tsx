@@ -39,14 +39,14 @@ const statusClasses: Record<AgentStatus, string> = {
   running: 'agent-box-running',
   waiting: 'agent-box-waiting',
   error: 'agent-box-error',
-  finished: 'agent-box-finished',
+  idle: 'agent-box-idle',
 }
 
 const statusLabels: Record<AgentStatus, string> = {
   running: 'Running',
   waiting: 'Waiting for input',
   error: 'Error',
-  finished: 'Idle',
+  idle: 'Idle',
 }
 
 const modeIcons: Record<AgentMode, typeof Zap> = {

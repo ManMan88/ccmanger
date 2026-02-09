@@ -218,7 +218,7 @@ fn test_agents_table_schema() {
     // Insert an agent
     conn.execute(
         r#"INSERT INTO agents (id, worktree_id, name, status, context_level, mode, permissions, display_order, created_at, updated_at)
-           VALUES ('ag_test', 'wt_test', 'Test Agent', 'finished', 0, 'regular', '["read"]', 0, datetime('now'), datetime('now'))"#,
+           VALUES ('ag_test', 'wt_test', 'Test Agent', 'idle', 0, 'regular', '["read"]', 0, datetime('now'), datetime('now'))"#,
         [],
     )
     .expect("Should insert agent");
@@ -233,7 +233,7 @@ fn test_agents_table_schema() {
         .expect("Should read agent");
 
     assert_eq!(name, "Test Agent");
-    assert_eq!(status, "finished");
+    assert_eq!(status, "idle");
     assert_eq!(mode, "regular");
 }
 
@@ -272,7 +272,7 @@ fn test_messages_table_schema() {
 
     conn.execute(
         r#"INSERT INTO agents (id, worktree_id, name, status, context_level, mode, permissions, display_order, created_at, updated_at)
-           VALUES ('ag_test', 'wt_test', 'Test Agent', 'finished', 0, 'regular', '["read"]', 0, datetime('now'), datetime('now'))"#,
+           VALUES ('ag_test', 'wt_test', 'Test Agent', 'idle', 0, 'regular', '["read"]', 0, datetime('now'), datetime('now'))"#,
         [],
     )
     .expect("Should insert agent");
@@ -333,7 +333,7 @@ fn test_cascade_delete_worktrees() {
 
     conn.execute(
         r#"INSERT INTO agents (id, worktree_id, name, status, context_level, mode, permissions, display_order, created_at, updated_at)
-           VALUES ('ag_test', 'wt_test', 'Test', 'finished', 0, 'regular', '[]', 0, datetime('now'), datetime('now'))"#,
+           VALUES ('ag_test', 'wt_test', 'Test', 'idle', 0, 'regular', '[]', 0, datetime('now'), datetime('now'))"#,
         [],
     )
     .unwrap();

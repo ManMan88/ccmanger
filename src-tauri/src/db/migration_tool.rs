@@ -124,30 +124,8 @@ pub fn migrate_from_nodejs(
         ],
     )?;
 
-    // Migrate agents
-    stats.agents_migrated = migrate_table(
-        &source_conn,
-        dest_conn,
-        "agents",
-        &[
-            "id",
-            "worktree_id",
-            "name",
-            "status",
-            "context_level",
-            "mode",
-            "permissions",
-            "display_order",
-            "pid",
-            "session_id",
-            "parent_agent_id",
-            "created_at",
-            "updated_at",
-            "started_at",
-            "stopped_at",
-            "deleted_at",
-        ],
-    )?;
+    // Migrate agents (with status 'finished' → 'idle' conversion)
+    stats.agents_migrated = migrate_agents(&source_conn, dest_conn)?;
 
     // Migrate messages
     stats.messages_migrated = migrate_table(
@@ -211,6 +189,52 @@ pub fn migrate_from_nodejs(
     );
 
     Ok(stats)
+}
+
+/// Migrate agents table with 'finished' → 'idle' status conversion
+fn migrate_agents(
+    source_conn: &Connection,
+    dest_conn: &Connection,
+) -> MigrationResult<usize> {
+    let columns = &[
+        "id", "worktree_id", "name", "status", "context_level", "mode",
+        "permissions", "display_order", "pid", "session_id", "parent_agent_id",
+        "created_at", "updated_at", "started_at", "stopped_at", "deleted_at",
+    ];
+    let columns_str = columns.join(", ");
+    let placeholders = columns.iter().map(|_| "?").collect::<Vec<_>>().join(", ");
+
+    let select_sql = format!("SELECT {} FROM agents", columns_str);
+    let insert_sql = format!(
+        "INSERT OR REPLACE INTO agents ({}) VALUES ({})",
+        columns_str, placeholders
+    );
+
+    let mut select_stmt = source_conn.prepare(&select_sql)?;
+    let mut insert_stmt = dest_conn.prepare(&insert_sql)?;
+
+    let status_idx = columns.iter().position(|&c| c == "status").unwrap();
+    let mut count = 0;
+    let mut rows = select_stmt.query([])?;
+
+    while let Some(row) = rows.next()? {
+        let mut values: Vec<rusqlite::types::Value> = (0..columns.len())
+            .map(|i| row.get(i).unwrap_or(rusqlite::types::Value::Null))
+            .collect();
+
+        // Convert 'finished' → 'idle'
+        if let rusqlite::types::Value::Text(ref s) = values[status_idx] {
+            if s == "finished" {
+                values[status_idx] = rusqlite::types::Value::Text("idle".to_string());
+            }
+        }
+
+        insert_stmt.execute(rusqlite::params_from_iter(values.iter()))?;
+        count += 1;
+    }
+
+    tracing::info!("Migrated {} agent records (finished → idle)", count);
+    Ok(count)
 }
 
 /// Migrate a single table from source to destination

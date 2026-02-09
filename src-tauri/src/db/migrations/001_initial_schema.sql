@@ -35,7 +35,7 @@ CREATE TABLE agents (
     id TEXT PRIMARY KEY,
     worktree_id TEXT NOT NULL REFERENCES worktrees(id) ON DELETE CASCADE,
     name TEXT NOT NULL,
-    status TEXT NOT NULL DEFAULT 'finished' CHECK (status IN ('running', 'waiting', 'error', 'finished')),
+    status TEXT NOT NULL DEFAULT 'idle' CHECK (status IN ('running', 'waiting', 'error', 'idle')),
     context_level INTEGER NOT NULL DEFAULT 0 CHECK (context_level >= 0 AND context_level <= 100),
     mode TEXT NOT NULL DEFAULT 'regular' CHECK (mode IN ('auto', 'plan', 'regular')),
     permissions TEXT NOT NULL DEFAULT '["read"]',
