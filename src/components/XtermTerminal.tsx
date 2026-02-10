@@ -65,6 +65,7 @@ export function XtermTerminal({ agentId, isActive }: XtermTerminalProps) {
     reconnectAttemptRef.current = 0
 
     const terminal = terminalRef.current
+    terminal.reset()
 
     function connect() {
       const ws = new WebSocket(`ws://127.0.0.1:3001/ws/pty/${agentId}`)

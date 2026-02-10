@@ -281,6 +281,8 @@ class WebSocketClient {
             : old
       )
 
+      this.updateAgentInWorkspaceCaches(payload.agentId, { status: payload.status })
+
       // Invalidate workspace to get updated data
       // We don't have workspace ID here, so we invalidate all workspaces
       queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all })
@@ -308,6 +310,7 @@ class WebSocketClient {
               }
             : old
       )
+      this.updateAgentInWorkspaceCaches(payload.agentId, { contextLevel })
     }
   }
 
@@ -318,6 +321,7 @@ class WebSocketClient {
     queryClient.setQueryData<Agent>(queryKeys.agents.detail(payload.agentId), (old) =>
       old ? { ...old, status: 'error' as AgentStatus } : old
     )
+    this.updateAgentInWorkspaceCaches(payload.agentId, { status: 'error' as AgentStatus })
   }
 
   private handleAgentTerminated(payload: AgentTerminatedPayload): void {
@@ -327,9 +331,39 @@ class WebSocketClient {
     queryClient.setQueryData<Agent>(queryKeys.agents.detail(payload.agentId), (old) =>
       old ? { ...old, status: 'idle' as AgentStatus, pid: null } : old
     )
+    this.updateAgentInWorkspaceCaches(payload.agentId, { status: 'idle' as AgentStatus, pid: null })
 
     // Invalidate workspace to get updated data
     queryClient.invalidateQueries({ queryKey: queryKeys.workspaces.all })
+  }
+
+  private updateAgentInWorkspaceCaches(agentId: string, updates: Partial<Agent>): void {
+    interface WorktreeWithAgents {
+      agents: Agent[]
+      previousAgents?: Agent[]
+    }
+    interface WorkspaceDetail {
+      worktrees: WorktreeWithAgents[]
+    }
+    const queries = queryClient.getQueryCache().findAll({
+      queryKey: queryKeys.workspaces.all,
+      type: 'active',
+    })
+    for (const query of queries) {
+      if (query.queryKey.length !== 2) continue
+      queryClient.setQueryData<WorkspaceDetail>(query.queryKey, (old) => {
+        if (!old?.worktrees) return old
+        return {
+          ...old,
+          worktrees: old.worktrees.map((wt) => ({
+            ...wt,
+            agents: wt.agents.map((a) => (a.id === agentId ? { ...a, ...updates } : a)),
+            previousAgents:
+              wt.previousAgents?.map((a) => (a.id === agentId ? { ...a, ...updates } : a)) ?? [],
+          })),
+        }
+      })
+    }
   }
 
   private handleWorkspaceUpdate(payload: WorkspaceUpdatedPayload): void {
