@@ -15,7 +15,6 @@ export function XtermTerminal({ agentId, isActive }: XtermTerminalProps) {
   const terminalRef = useRef<Terminal | null>(null)
   const wsRef = useRef<WebSocket | null>(null)
   const fitAddonRef = useRef<FitAddon | null>(null)
-  const intentionalCloseRef = useRef(false)
   const reconnectAttemptRef = useRef(0)
   const reconnectTimeoutRef = useRef<ReturnType<typeof setTimeout> | null>(null)
   const disposersRef = useRef<{
@@ -61,18 +60,22 @@ export function XtermTerminal({ agentId, isActive }: XtermTerminalProps) {
   useEffect(() => {
     if (!isActive || !terminalRef.current) return
 
-    intentionalCloseRef.current = false
+    let cancelled = false // Local to THIS effect invocation — no shared-state race
     reconnectAttemptRef.current = 0
 
     const terminal = terminalRef.current
     terminal.reset()
+    terminal.focus()
 
     function connect() {
+      if (cancelled) return
+
       const ws = new WebSocket(`ws://127.0.0.1:3001/ws/pty/${agentId}`)
       ws.binaryType = 'arraybuffer'
       wsRef.current = ws
 
       ws.onmessage = (event) => {
+        if (cancelled) return
         const data = event.data instanceof ArrayBuffer ? new Uint8Array(event.data) : event.data
         terminal.write(data)
       }
@@ -93,8 +96,11 @@ export function XtermTerminal({ agentId, isActive }: XtermTerminalProps) {
 
       disposersRef.current = { onData, onResize }
 
-      // Send initial size once connected
       ws.onopen = () => {
+        if (cancelled) {
+          ws.close()
+          return
+        }
         if (reconnectAttemptRef.current > 0) {
           terminal.writeln('\r\n\x1b[32m[Reconnected]\x1b[0m')
         }
@@ -104,19 +110,19 @@ export function XtermTerminal({ agentId, isActive }: XtermTerminalProps) {
       }
 
       ws.onerror = () => {
-        if (!intentionalCloseRef.current) {
+        if (!cancelled) {
           terminal.writeln('\r\n\x1b[31m[WebSocket connection error]\x1b[0m')
         }
       }
 
       ws.onclose = () => {
+        if (cancelled) return // Must check BEFORE touching disposersRef — it may belong to the new effect
+
         if (disposersRef.current) {
           disposersRef.current.onData.dispose()
           disposersRef.current.onResize.dispose()
           disposersRef.current = null
         }
-
-        if (intentionalCloseRef.current) return
 
         reconnectAttemptRef.current++
         if (reconnectAttemptRef.current <= MAX_RECONNECT_ATTEMPTS) {
@@ -134,7 +140,7 @@ export function XtermTerminal({ agentId, isActive }: XtermTerminalProps) {
     connect()
 
     return () => {
-      intentionalCloseRef.current = true
+      cancelled = true
       if (reconnectTimeoutRef.current) {
         clearTimeout(reconnectTimeoutRef.current)
         reconnectTimeoutRef.current = null
