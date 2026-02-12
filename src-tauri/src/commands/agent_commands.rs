@@ -105,19 +105,6 @@ pub async fn stop_agent(
         .map_err(|e| e.to_string())
 }
 
-/// Fork an agent
-#[tauri::command]
-pub async fn fork_agent(
-    id: String,
-    name: Option<String>,
-    state: State<'_, AppState>,
-) -> Result<Agent, String> {
-    state
-        .agent_service
-        .fork_agent(&id, name)
-        .map_err(|e| e.to_string())
-}
-
 /// Restore a deleted agent
 #[tauri::command]
 pub async fn restore_agent(

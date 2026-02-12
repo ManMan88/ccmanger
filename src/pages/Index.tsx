@@ -35,7 +35,6 @@ const Index = () => {
     addAgent,
     removeAgent,
     updateAgent,
-    forkAgent,
     reorderAgents,
     loadPreviousAgent,
     setSortMode,
@@ -228,8 +227,6 @@ const Index = () => {
                   worktree={worktree}
                   onAddAgent={() => addAgent(worktree.id)}
                   onRemoveAgent={(agentId) => removeAgent(worktree.id, agentId)}
-                  onUpdateAgent={(agentId, updates) => updateAgent(worktree.id, agentId, updates)}
-                  onForkAgent={(agentId) => forkAgent(worktree.id, agentId)}
                   onSelectAgent={(agent) => handleSelectAgent(agent, worktree)}
                   onReorderAgents={(agentIds) => reorderAgents(worktree.id, agentIds)}
                   onRemoveWorktree={() => removeWorktree(worktree.id)}

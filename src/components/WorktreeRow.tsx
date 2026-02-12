@@ -1,5 +1,5 @@
 import { useState, useMemo, useRef } from 'react'
-import type { Agent, AgentStatus, AgentMode, SortMode } from '@claude-manager/shared'
+import type { Agent, SortMode } from '@claude-manager/shared'
 import { AgentBox } from './AgentBox'
 import {
   Plus,
@@ -49,8 +49,6 @@ interface WorktreeRowProps {
   worktree: WorktreeCompat
   onAddAgent: () => void
   onRemoveAgent: (agentId: string) => void
-  onUpdateAgent: (agentId: string, updates: Partial<Agent>) => void
-  onForkAgent: (agentId: string) => void
   onSelectAgent: (agent: Agent) => void
   onReorderAgents: (agentIds: string[]) => void
   onRemoveWorktree: () => void
@@ -75,8 +73,6 @@ export function WorktreeRow({
   worktree,
   onAddAgent,
   onRemoveAgent,
-  onUpdateAgent,
-  onForkAgent,
   onSelectAgent,
   onReorderAgents,
   onRemoveWorktree,
@@ -301,14 +297,7 @@ export function WorktreeRow({
                     <AgentBox
                       agent={agent}
                       onSelect={() => onSelectAgent(agent)}
-                      onUpdateName={(name) => onUpdateAgent(agent.id, { name })}
-                      onUpdateStatus={(status: AgentStatus) => onUpdateAgent(agent.id, { status })}
-                      onUpdateMode={(mode: AgentMode) => onUpdateAgent(agent.id, { mode })}
-                      onUpdatePermissions={(permissions) =>
-                        onUpdateAgent(agent.id, { permissions })
-                      }
                       onDelete={() => onRemoveAgent(agent.id)}
-                      onFork={() => onForkAgent(agent.id)}
                       isDragging={draggedAgent === agent.id}
                     />
                   </div>

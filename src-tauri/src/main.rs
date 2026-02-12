@@ -155,7 +155,6 @@ fn main() {
             commands::delete_agent,
             commands::start_agent,
             commands::stop_agent,
-            commands::fork_agent,
             commands::restore_agent,
             commands::reorder_agents,
             // Usage commands

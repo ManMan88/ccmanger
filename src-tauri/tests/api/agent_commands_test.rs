@@ -113,58 +113,6 @@ fn test_agent_not_found() {
 }
 
 #[test]
-fn test_agent_fork() {
-    let ctx = TestContext::new();
-    let pm = Arc::new(ProcessManager::new("echo".to_string()));
-    let service = AgentService::new(ctx.pool.clone(), pm);
-
-    // Create parent agent
-    let parent = service
-        .create_agent(
-            &ctx.worktree_id,
-            Some("Parent Agent".to_string()),
-            AgentMode::Auto,
-            vec![Permission::Read, Permission::Write],
-        )
-        .expect("Should create parent");
-
-    // Fork agent
-    let forked = service
-        .fork_agent(&parent.id, None)
-        .expect("Should fork agent");
-
-    assert_eq!(forked.name, "Parent Agent (fork)");
-    assert_eq!(forked.mode, AgentMode::Auto);
-    assert_eq!(
-        forked.permissions,
-        vec![Permission::Read, Permission::Write]
-    );
-    assert_eq!(forked.parent_agent_id, Some(parent.id));
-}
-
-#[test]
-fn test_agent_fork_with_custom_name() {
-    let ctx = TestContext::new();
-    let pm = Arc::new(ProcessManager::new("echo".to_string()));
-    let service = AgentService::new(ctx.pool.clone(), pm);
-
-    let parent = service
-        .create_agent(
-            &ctx.worktree_id,
-            Some("Parent".to_string()),
-            AgentMode::Regular,
-            vec![],
-        )
-        .expect("Should create parent");
-
-    let forked = service
-        .fork_agent(&parent.id, Some("Custom Fork Name".to_string()))
-        .expect("Should fork agent");
-
-    assert_eq!(forked.name, "Custom Fork Name");
-}
-
-#[test]
 fn test_agent_restore() {
     let ctx = TestContext::new();
     let pm = Arc::new(ProcessManager::new("echo".to_string()));

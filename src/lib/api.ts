@@ -264,10 +264,6 @@ export const api = {
       return tauriInvoke<void>('delete_agent', { id, archive })
     },
 
-    fork: async (id: string, name?: string) => {
-      return tauriInvoke<Agent>('fork_agent', { id, name })
-    },
-
     restore: async (id: string) => {
       return tauriInvoke<Agent>('restore_agent', { id })
     },

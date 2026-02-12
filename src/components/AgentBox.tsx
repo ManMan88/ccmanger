@@ -1,37 +1,13 @@
 import { useMemo } from 'react'
-import type { Agent, AgentStatus, AgentMode } from '@claude-manager/shared'
-import {
-  Play,
-  Trash2,
-  GitFork,
-  Shield,
-  Zap,
-  ClipboardList,
-  Settings2,
-  GripVertical,
-  Square,
-} from 'lucide-react'
+import type { Agent, AgentStatus } from '@claude-manager/shared'
+import { Trash2, GripVertical } from 'lucide-react'
 import { Button } from '@/components/ui/button'
-import {
-  DropdownMenu,
-  DropdownMenuContent,
-  DropdownMenuItem,
-  DropdownMenuTrigger,
-} from '@/components/ui/dropdown-menu'
 import { Tooltip, TooltipContent, TooltipTrigger } from '@/components/ui/tooltip'
-import { Checkbox } from '@/components/ui/checkbox'
 
 interface AgentBoxProps {
   agent: Agent
   onSelect: () => void
-  onUpdateName: (name: string) => void
-  onUpdateStatus: (status: AgentStatus) => void
-  onUpdateMode: (mode: AgentMode) => void
-  onUpdatePermissions?: (permissions: string[]) => void
   onDelete: () => void
-  onFork: () => void
-  onStart?: () => void
-  onStop?: () => void
   isDragging?: boolean
 }
 
@@ -49,61 +25,12 @@ const statusLabels: Record<AgentStatus, string> = {
   idle: 'Idle',
 }
 
-const modeIcons: Record<AgentMode, typeof Zap> = {
-  auto: Zap,
-  plan: ClipboardList,
-  regular: Settings2,
-}
-
-const modeLabels: Record<AgentMode, string> = {
-  auto: 'Auto Approve',
-  plan: 'Plan Mode',
-  regular: 'Regular Mode',
-}
-
-export function AgentBox({
-  agent,
-  onSelect,
-  onUpdateStatus,
-  onUpdateMode,
-  onUpdatePermissions,
-  onDelete,
-  onFork,
-  onStart,
-  onStop,
-  isDragging,
-}: AgentBoxProps) {
-  const ModeIcon = modeIcons[agent.mode]
-
+export function AgentBox({ agent, onSelect, onDelete, isDragging }: AgentBoxProps) {
   const contextColor = useMemo(() => {
     if (agent.contextLevel >= 80) return 'text-status-error'
     if (agent.contextLevel >= 60) return 'text-status-waiting'
     return 'text-muted-foreground'
   }, [agent.contextLevel])
-
-  const handlePermissionToggle = (permission: string) => {
-    if (!onUpdatePermissions) return
-    const newPermissions = agent.permissions.includes(permission)
-      ? agent.permissions.filter((p) => p !== permission)
-      : [...agent.permissions, permission]
-    onUpdatePermissions(newPermissions)
-  }
-
-  const handlePlayPause = () => {
-    if (agent.status === 'running') {
-      if (onStop) {
-        onStop()
-      } else {
-        onUpdateStatus('waiting')
-      }
-    } else {
-      if (onStart) {
-        onStart()
-      } else {
-        onUpdateStatus('running')
-      }
-    }
-  }
 
   return (
     <article
@@ -155,120 +82,6 @@ export function AgentBox({
         role="toolbar"
         aria-label={`Actions for ${agent.name}`}
       >
-        {agent.status === 'running' ? (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={handlePlayPause}
-                data-testid={`agent-pause-${agent.id}`}
-                aria-label="Stop agent"
-              >
-                <Square className="h-3.5 w-3.5" aria-hidden="true" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Stop</TooltipContent>
-          </Tooltip>
-        ) : (
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <Button
-                variant="ghost"
-                size="icon"
-                className="h-7 w-7"
-                onClick={handlePlayPause}
-                data-testid={`agent-play-${agent.id}`}
-                aria-label="Start agent"
-              >
-                <Play className="h-3.5 w-3.5" aria-hidden="true" />
-              </Button>
-            </TooltipTrigger>
-            <TooltipContent>Start</TooltipContent>
-          </Tooltip>
-        )}
-
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  data-testid={`agent-mode-${agent.id}`}
-                >
-                  <ModeIcon className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>{modeLabels[agent.mode]}</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent className="bg-popover">
-            <DropdownMenuItem onClick={() => onUpdateMode('auto')}>
-              <Zap className="mr-2 h-4 w-4" />
-              Auto Approve
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onUpdateMode('plan')}>
-              <ClipboardList className="mr-2 h-4 w-4" />
-              Plan Mode
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => onUpdateMode('regular')}>
-              <Settings2 className="mr-2 h-4 w-4" />
-              Regular Mode
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <DropdownMenu>
-          <Tooltip>
-            <TooltipTrigger asChild>
-              <DropdownMenuTrigger asChild>
-                <Button
-                  variant="ghost"
-                  size="icon"
-                  className="h-7 w-7"
-                  data-testid={`agent-permissions-${agent.id}`}
-                >
-                  <Shield className="h-3.5 w-3.5" />
-                </Button>
-              </DropdownMenuTrigger>
-            </TooltipTrigger>
-            <TooltipContent>Permissions</TooltipContent>
-          </Tooltip>
-          <DropdownMenuContent className="bg-popover">
-            <DropdownMenuItem onClick={() => handlePermissionToggle('read')}>
-              <Checkbox checked={agent.permissions.includes('read')} className="mr-2" />
-              Read
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePermissionToggle('write')}>
-              <Checkbox checked={agent.permissions.includes('write')} className="mr-2" />
-              Write
-            </DropdownMenuItem>
-            <DropdownMenuItem onClick={() => handlePermissionToggle('execute')}>
-              <Checkbox checked={agent.permissions.includes('execute')} className="mr-2" />
-              Execute
-            </DropdownMenuItem>
-          </DropdownMenuContent>
-        </DropdownMenu>
-
-        <Tooltip>
-          <TooltipTrigger asChild>
-            <Button
-              variant="ghost"
-              size="icon"
-              className="h-7 w-7"
-              onClick={onFork}
-              data-testid={`agent-fork-${agent.id}`}
-              aria-label="Fork agent"
-            >
-              <GitFork className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
-          </TooltipTrigger>
-          <TooltipContent>Fork</TooltipContent>
-        </Tooltip>
-
         <Tooltip>
           <TooltipTrigger asChild>
             <Button

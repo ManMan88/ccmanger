@@ -88,23 +88,6 @@ export function useAgents(worktreeId: string | null) {
     },
   })
 
-  // Fork agent
-  const forkAgentMutation = useMutation({
-    mutationFn: ({ agentId, name }: { agentId: string; name?: string }) =>
-      api.agents.fork(agentId, name),
-    onSuccess: () => {
-      if (worktreeId) {
-        queryClient.invalidateQueries({
-          queryKey: queryKeys.agents.byWorktree(worktreeId),
-        })
-      }
-      // Also invalidate workspace to get updated agent counts
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.workspaces.all,
-      })
-    },
-  })
-
   // Restore agent
   const restoreAgentMutation = useMutation({
     mutationFn: (agentId: string) => api.agents.restore(agentId),
@@ -201,7 +184,6 @@ export function useAgents(worktreeId: string | null) {
     createAgent: createAgentMutation.mutate,
     updateAgent: updateAgentMutation.mutate,
     deleteAgent: deleteAgentMutation.mutate,
-    forkAgent: forkAgentMutation.mutate,
     restoreAgent: restoreAgentMutation.mutate,
     reorderAgents: reorderAgentsMutation.mutate,
 
@@ -227,15 +209,6 @@ export function useAgent(agentId: string | null) {
     enabled: !!agentId,
   })
 
-  const stopAgentMutation = useMutation({
-    mutationFn: (force = false) => api.agents.stop(agentId!, force),
-    onSuccess: (data) => {
-      if (agentId) {
-        queryClient.setQueryData(queryKeys.agents.detail(agentId), data)
-      }
-    },
-  })
-
   const startAgentMutation = useMutation({
     mutationFn: (initialPrompt?: string) => api.agents.start(agentId!, initialPrompt),
     onSuccess: (data) => {
@@ -259,11 +232,9 @@ export function useAgent(agentId: string | null) {
     isLoading: agentQuery.isLoading,
     isError: agentQuery.isError,
 
-    stopAgent: stopAgentMutation.mutate,
     startAgent: startAgentMutation.mutate,
     resumeAgent: resumeAgentMutation.mutate,
 
-    isStopping: stopAgentMutation.isPending,
     isStarting: startAgentMutation.isPending,
     isResuming: resumeAgentMutation.isPending,
   }

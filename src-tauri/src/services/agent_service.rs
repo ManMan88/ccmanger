@@ -178,39 +178,6 @@ impl AgentService {
         .map_err(|e| AgentError::Database(e.to_string()))
     }
 
-    /// Fork an agent
-    pub fn fork_agent(&self, id: &str, name: Option<String>) -> Result<Agent, AgentError> {
-        let parent = self.get_agent(id)?;
-        let now = chrono::Utc::now().to_rfc3339();
-
-        let forked = Agent {
-            id: format!(
-                "ag_{}{}",
-                chrono::Utc::now().timestamp_millis(),
-                &Uuid::new_v4().to_string()[..8]
-            ),
-            name: name.unwrap_or_else(|| format!("{} (fork)", parent.name)),
-            parent_agent_id: Some(parent.id.clone()),
-            status: AgentStatus::Idle,
-            pid: None,
-            session_id: parent.session_id.clone(),
-            worktree_id: parent.worktree_id,
-            context_level: parent.context_level,
-            mode: parent.mode,
-            permissions: parent.permissions,
-            display_order: parent.display_order + 1,
-            created_at: now.clone(),
-            updated_at: now,
-            started_at: None,
-            stopped_at: None,
-            deleted_at: None,
-        };
-
-        self.agent_repo
-            .create(&forked)
-            .map_err(|e| AgentError::Database(e.to_string()))
-    }
-
     /// Restore a deleted agent
     pub fn restore_agent(&self, id: &str) -> Result<Agent, AgentError> {
         self.agent_repo
@@ -486,30 +453,6 @@ mod tests {
         // Should not appear even with include_deleted
         let agents = service.list_agents(&worktree.id, true).unwrap();
         assert_eq!(agents.len(), 0);
-    }
-
-    #[test]
-    fn test_fork_agent() {
-        let pool = create_test_pool();
-        let (_, worktree) = setup_test_data(&pool);
-        let process_manager = Arc::new(ProcessManager::new("claude".to_string()));
-        let service = AgentService::new(pool, process_manager);
-
-        let parent = service
-            .create_agent(
-                &worktree.id,
-                Some("Parent Agent".to_string()),
-                AgentMode::Auto,
-                vec![Permission::Read, Permission::Write],
-            )
-            .unwrap();
-
-        let forked = service.fork_agent(&parent.id, None).unwrap();
-
-        assert_eq!(forked.name, "Parent Agent (fork)");
-        assert_eq!(forked.mode, AgentMode::Auto);
-        assert_eq!(forked.permissions, vec![Permission::Read, Permission::Write]);
-        assert_eq!(forked.parent_agent_id, Some(parent.id));
     }
 
     #[test]

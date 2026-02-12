@@ -1,5 +1,5 @@
-import { useState } from 'react'
-import type { Agent, AgentMode } from '@claude-manager/shared'
+import { useState, useEffect } from 'react'
+import type { Agent } from '@claude-manager/shared'
 import { useAgent } from '@/hooks/useAgents'
 import { useAgentSubscription, useWebSocket } from '@/hooks/useWebSocket'
 import { XtermTerminal } from '@/components/XtermTerminal'
@@ -8,7 +8,7 @@ import { Button } from '@/components/ui/button'
 import { Input } from '@/components/ui/input'
 import { ScrollArea } from '@/components/ui/scroll-area'
 import { Tabs, TabsList, TabsTrigger } from '@/components/ui/tabs'
-import { Zap, ClipboardList, Settings2, X, Edit2, Check, WifiOff, Play, Square } from 'lucide-react'
+import { X, Edit2, Check, WifiOff } from 'lucide-react'
 
 interface AgentModalProps {
   agents: Agent[]
@@ -17,12 +17,6 @@ interface AgentModalProps {
   onClose: () => void
   onUpdateAgent: (agentId: string, updates: Partial<Agent>) => void
   onSelectAgent: (agentId: string) => void
-}
-
-const modeIcons: Record<AgentMode, typeof Zap> = {
-  auto: Zap,
-  plan: ClipboardList,
-  regular: Settings2,
 }
 
 const statusClasses = {
@@ -44,12 +38,7 @@ export function AgentModal({
   const [editedName, setEditedName] = useState('')
 
   // Get agent data and actions from API
-  const {
-    agent: agentData,
-    stopAgent,
-    startAgent,
-    isStarting,
-  } = useAgent(open ? selectedAgentId : null)
+  const { agent: agentData, startAgent, isStarting } = useAgent(open ? selectedAgentId : null)
 
   // Subscribe to agent updates via WebSocket
   useAgentSubscription(open ? selectedAgentId : null)
@@ -60,9 +49,14 @@ export function AgentModal({
   // Find the agent from props (for display purposes before API data loads)
   const currentAgent = agentData || agents.find((a) => a.id === selectedAgentId)
 
-  if (!currentAgent || agents.length === 0) return null
+  // Auto-start agent when modal opens
+  useEffect(() => {
+    if (open && currentAgent && !currentAgent.pid && !isStarting) {
+      startAgent()
+    }
+  }, [open, currentAgent?.id, currentAgent?.pid])
 
-  const ModeIcon = modeIcons[currentAgent.mode]
+  if (!currentAgent || agents.length === 0) return null
 
   const handleStartEditing = (agent: Agent) => {
     setEditedName(agent.name)
@@ -147,28 +141,6 @@ export function AgentModal({
               )}
             </div>
             <div className="flex items-center gap-3">
-              {/* Start/Stop Button */}
-              {currentAgent.pid ? (
-                <Button variant="outline" size="sm" onClick={() => stopAgent()} className="gap-1.5">
-                  <Square className="h-3.5 w-3.5" />
-                  Stop
-                </Button>
-              ) : (
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => startAgent()}
-                  className="gap-1.5"
-                >
-                  <Play className="h-3.5 w-3.5" />
-                  Start
-                </Button>
-              )}
-
-              <div className="flex items-center gap-1.5 rounded-md bg-secondary px-2 py-1">
-                <ModeIcon className="h-3.5 w-3.5" />
-                <span className="text-xs capitalize">{currentAgent.mode}</span>
-              </div>
               <div className="context-indicator">Context: {currentAgent.contextLevel}%</div>
               <Button size="icon" variant="ghost" className="h-8 w-8" onClick={onClose}>
                 <X className="h-4 w-4" />

@@ -289,16 +289,6 @@ export function useWorkspace(workspaceId: string | null) {
     },
   })
 
-  const forkAgentMutation = useMutation({
-    mutationFn: ({ agentId, name }: { agentId: string; name?: string }) =>
-      api.agents.fork(agentId, name),
-    onSuccess: () => {
-      queryClient.invalidateQueries({
-        queryKey: queryKeys.workspaces.detail(workspaceId!),
-      })
-    },
-  })
-
   const restoreAgentMutation = useMutation({
     mutationFn: (agentId: string) => api.agents.restore(agentId),
     onSuccess: () => {
@@ -378,10 +368,6 @@ export function useWorkspace(workspaceId: string | null) {
     updateAgentMutation.mutate({ agentId, ...updates })
   }
 
-  const forkAgent = (_worktreeId: string, agentId: string) => {
-    forkAgentMutation.mutate({ agentId })
-  }
-
   const reorderAgents = (worktreeId: string, agentIds: string[]) => {
     reorderAgentsMutation.mutate({ worktreeId, agentIds })
   }
@@ -415,7 +401,6 @@ export function useWorkspace(workspaceId: string | null) {
     addAgent,
     removeAgent,
     updateAgent,
-    forkAgent,
     reorderAgents,
     loadPreviousAgent,
 

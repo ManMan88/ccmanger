@@ -152,29 +152,6 @@ fn bench_update_agent(c: &mut Criterion) {
     });
 }
 
-fn bench_fork_agent(c: &mut Criterion) {
-    let (pool, _temp_dir, _, worktree_id) = setup_test_environment();
-    let pm = Arc::new(ProcessManager::new("echo".to_string()));
-    let service = AgentService::new(pool, pm);
-
-    let agent = service
-        .create_agent(
-            &worktree_id,
-            Some("Parent Agent".to_string()),
-            AgentMode::Auto,
-            vec![Permission::Read, Permission::Write],
-        )
-        .expect("Should create agent");
-
-    c.bench_function("fork_agent", |b| {
-        b.iter(|| {
-            service
-                .fork_agent(&agent.id, None)
-                .expect("Should fork agent")
-        })
-    });
-}
-
 fn bench_list_agents_scaling(c: &mut Criterion) {
     let mut group = c.benchmark_group("list_agents_scaling");
 
@@ -213,7 +190,6 @@ criterion_group!(
     bench_list_agents,
     bench_get_agent,
     bench_update_agent,
-    bench_fork_agent,
     bench_list_agents_scaling,
 );
 
