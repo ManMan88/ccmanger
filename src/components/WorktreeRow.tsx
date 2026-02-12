@@ -1,4 +1,4 @@
-import { useState, useMemo } from 'react'
+import { useState, useMemo, useRef } from 'react'
 import type { Agent, AgentStatus, AgentMode, SortMode } from '@claude-manager/shared'
 import { AgentBox } from './AgentBox'
 import {
@@ -58,9 +58,10 @@ interface WorktreeRowProps {
   onLoadPreviousAgent: (agentId: string) => void
   onSetSortMode: (sortMode: SortMode) => void
   isDragging?: boolean
-  onDragStart?: () => void
+  onDragStart?: (e: React.DragEvent) => void
   onDragOver?: (e: React.DragEvent) => void
   onDragEnd?: () => void
+  onDrop?: (e: React.DragEvent) => void
 }
 
 const statusOrder: Record<AgentStatus, number> = {
@@ -86,8 +87,10 @@ export function WorktreeRow({
   onDragStart,
   onDragOver,
   onDragEnd,
+  onDrop,
 }: WorktreeRowProps) {
   const [draggedAgent, setDraggedAgent] = useState<string | null>(null)
+  const draggedAgentRef = useRef<string | null>(null)
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false)
   const [newBranch, setNewBranch] = useState(worktree.branch)
 
@@ -104,31 +107,37 @@ export function WorktreeRow({
     }
   }, [worktree.agents, worktree.sortMode])
 
-  const handleDragStart = (agentId: string) => {
+  const handleDragStart = (e: React.DragEvent, agentId: string) => {
     if (worktree.sortMode !== 'free') return
+    e.dataTransfer.setData('text/plain', agentId)
+    e.dataTransfer.effectAllowed = 'move'
     setDraggedAgent(agentId)
+    draggedAgentRef.current = agentId
   }
 
   const handleDragOver = (e: React.DragEvent, targetAgentId: string) => {
     e.preventDefault()
+    e.dataTransfer.dropEffect = 'move'
     if (worktree.sortMode !== 'free') return
-    if (!draggedAgent || draggedAgent === targetAgentId) return
+    const dragged = draggedAgentRef.current
+    if (!dragged || dragged === targetAgentId) return
 
     const currentOrder = worktree.agents.map((a) => a.id)
-    const draggedIndex = currentOrder.indexOf(draggedAgent)
+    const draggedIndex = currentOrder.indexOf(dragged)
     const targetIndex = currentOrder.indexOf(targetAgentId)
 
     if (draggedIndex === -1 || targetIndex === -1) return
 
     const newOrder = [...currentOrder]
     newOrder.splice(draggedIndex, 1)
-    newOrder.splice(targetIndex, 0, draggedAgent)
+    newOrder.splice(targetIndex, 0, dragged)
 
     onReorderAgents(newOrder)
   }
 
   const handleDragEnd = () => {
     setDraggedAgent(null)
+    draggedAgentRef.current = null
   }
 
   const handleCheckout = () => {
@@ -151,6 +160,7 @@ export function WorktreeRow({
         onDragStart={onDragStart}
         onDragOver={onDragOver}
         onDragEnd={onDragEnd}
+        onDrop={onDrop}
       >
         {/* Header */}
         <div className="worktree-header">
@@ -279,9 +289,13 @@ export function WorktreeRow({
                   <div
                     key={agent.id}
                     draggable={worktree.sortMode === 'free'}
-                    onDragStart={() => handleDragStart(agent.id)}
+                    onDragStart={(e) => {
+                      e.stopPropagation()
+                      handleDragStart(e, agent.id)
+                    }}
                     onDragOver={(e) => handleDragOver(e, agent.id)}
                     onDragEnd={handleDragEnd}
+                    onDrop={(e) => e.preventDefault()}
                     className={`w-56 flex-shrink-0 ${worktree.sortMode !== 'free' ? 'cursor-default' : ''}`}
                   >
                     <AgentBox

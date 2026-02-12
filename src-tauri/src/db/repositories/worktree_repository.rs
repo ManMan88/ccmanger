@@ -137,6 +137,7 @@ impl WorktreeRepository {
                 branch = ?,
                 sort_mode = ?,
                 display_order = ?,
+                is_main = ?,
                 updated_at = datetime('now')
             WHERE id = ?
         "#,
@@ -145,6 +146,7 @@ impl WorktreeRepository {
                 worktree.branch,
                 worktree.sort_mode.as_str(),
                 worktree.display_order,
+                worktree.is_main as i32,
                 worktree.id,
             ],
         )?;
