@@ -160,6 +160,13 @@ export function useWorkspace(workspaceId: string | null) {
         queryKey: queryKeys.workspaces.detail(workspaceId!),
       })
     },
+    onError: (error) => {
+      toast({
+        variant: 'destructive',
+        title: 'Failed to checkout branch',
+        description: error instanceof Error ? error.message : String(error),
+      })
+    },
   })
 
   // Update worktree (sort mode, order)
@@ -352,8 +359,8 @@ export function useWorkspace(workspaceId: string | null) {
     removeWorktreeMutation.mutate({ worktreeId })
   }
 
-  const checkoutBranch = (worktreeId: string, branch: string) => {
-    checkoutBranchMutation.mutate({ worktreeId, branch })
+  const checkoutBranch = (worktreeId: string, branch: string, createBranch?: boolean) => {
+    checkoutBranchMutation.mutate({ worktreeId, branch, createBranch })
   }
 
   const addAgent = (worktreeId: string) => {

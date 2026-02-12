@@ -230,7 +230,12 @@ const Index = () => {
                   onSelectAgent={(agent) => handleSelectAgent(agent, worktree)}
                   onReorderAgents={(agentIds) => reorderAgents(worktree.id, agentIds)}
                   onRemoveWorktree={() => removeWorktree(worktree.id)}
-                  onCheckoutBranch={(branch) => checkoutBranch(worktree.id, branch)}
+                  onCheckoutBranch={(branch, createBranch) =>
+                    checkoutBranch(worktree.id, branch, createBranch)
+                  }
+                  usedBranches={workspace.worktrees
+                    .filter((wt) => wt.id !== worktree.id)
+                    .map((wt) => wt.branch)}
                   onLoadPreviousAgent={(agentId) => loadPreviousAgent(worktree.id, agentId)}
                   onSetSortMode={(sortMode) => setSortMode(worktree.id, sortMode)}
                   isDragging={draggedWorktreeId === worktree.id}

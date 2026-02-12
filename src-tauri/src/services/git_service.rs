@@ -189,7 +189,18 @@ impl GitService {
         }
 
         let obj = repo.revparse_single(&format!("refs/heads/{}", branch))?;
-        repo.checkout_tree(&obj, None)?;
+
+        let mut checkout_builder = git2::build::CheckoutBuilder::new();
+        checkout_builder.safe();
+
+        if let Err(e) = repo.checkout_tree(&obj, Some(&mut checkout_builder)) {
+            if e.class() == git2::ErrorClass::Checkout {
+                return Err(GitError::Git(git2::Error::from_str(
+                    &format!("Cannot switch to branch '{}': you have uncommitted changes. Please commit or stash your changes before switching branches.", branch)
+                )));
+            }
+            return Err(GitError::Git(e));
+        }
         repo.set_head(&format!("refs/heads/{}", branch))?;
 
         Ok(())

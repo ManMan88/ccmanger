@@ -1,4 +1,4 @@
-import { useState, useMemo, useRef } from 'react'
+import { useState, useMemo, useRef, useEffect } from 'react'
 import type { Agent, SortMode } from '@claude-manager/shared'
 import { AgentBox } from './AgentBox'
 import {
@@ -10,6 +10,9 @@ import {
   MoreHorizontal,
   ArrowUpDown,
   GripVertical,
+  Check,
+  Loader2,
+  ArrowLeft,
 } from 'lucide-react'
 import { ScrollArea, ScrollBar } from '@/components/ui/scroll-area'
 import { Button } from '@/components/ui/button'
@@ -30,8 +33,18 @@ import {
   DialogTitle,
   DialogFooter,
 } from '@/components/ui/dialog'
+import {
+  Command,
+  CommandInput,
+  CommandList,
+  CommandEmpty,
+  CommandGroup,
+  CommandItem,
+  CommandSeparator,
+} from '@/components/ui/command'
 import { Input } from '@/components/ui/input'
 import { Label } from '@/components/ui/label'
+import { api } from '@/lib/api'
 
 // Worktree type compatible with both old frontend types and shared types
 interface WorktreeCompat {
@@ -52,9 +65,10 @@ interface WorktreeRowProps {
   onSelectAgent: (agent: Agent) => void
   onReorderAgents: (agentIds: string[]) => void
   onRemoveWorktree: () => void
-  onCheckoutBranch: (branch: string) => void
+  onCheckoutBranch: (branch: string, createBranch: boolean) => void
   onLoadPreviousAgent: (agentId: string) => void
   onSetSortMode: (sortMode: SortMode) => void
+  usedBranches: string[]
   isDragging?: boolean
   onDragStart?: (e: React.DragEvent) => void
   onDragOver?: (e: React.DragEvent) => void
@@ -79,6 +93,7 @@ export function WorktreeRow({
   onCheckoutBranch,
   onLoadPreviousAgent,
   onSetSortMode,
+  usedBranches,
   isDragging,
   onDragStart,
   onDragOver,
@@ -88,7 +103,25 @@ export function WorktreeRow({
   const [draggedAgent, setDraggedAgent] = useState<string | null>(null)
   const draggedAgentRef = useRef<string | null>(null)
   const [checkoutDialogOpen, setCheckoutDialogOpen] = useState(false)
-  const [newBranch, setNewBranch] = useState(worktree.branch)
+  const [dialogMode, setDialogMode] = useState<'select' | 'create'>('select')
+  const [newBranchName, setNewBranchName] = useState('')
+  const [branches, setBranches] = useState<{ local: string[]; remote: string[] } | null>(null)
+  const [branchesLoading, setBranchesLoading] = useState(false)
+
+  useEffect(() => {
+    if (checkoutDialogOpen) {
+      setBranchesLoading(true)
+      setDialogMode('select')
+      setNewBranchName('')
+      api.worktrees
+        .getBranches('', worktree.id)
+        .then((info) => setBranches({ local: info.local, remote: info.remote }))
+        .catch(() => setBranches({ local: [], remote: [] }))
+        .finally(() => setBranchesLoading(false))
+    } else {
+      setBranches(null)
+    }
+  }, [checkoutDialogOpen, worktree.id])
 
   const sortedAgents = useMemo(() => {
     const agents = [...worktree.agents]
@@ -136,8 +169,14 @@ export function WorktreeRow({
     draggedAgentRef.current = null
   }
 
-  const handleCheckout = () => {
-    onCheckoutBranch(newBranch)
+  const handleSelectBranch = (branch: string) => {
+    onCheckoutBranch(branch, false)
+    setCheckoutDialogOpen(false)
+  }
+
+  const handleCreateBranch = () => {
+    if (!newBranchName.trim()) return
+    onCheckoutBranch(newBranchName.trim(), true)
     setCheckoutDialogOpen(false)
   }
 
@@ -311,26 +350,137 @@ export function WorktreeRow({
 
       {/* Checkout Branch Dialog */}
       <Dialog open={checkoutDialogOpen} onOpenChange={setCheckoutDialogOpen}>
-        <DialogContent className="bg-card">
-          <DialogHeader>
-            <DialogTitle>Checkout Branch</DialogTitle>
+        <DialogContent className="bg-card p-0">
+          <DialogHeader className="px-4 pt-4">
+            <DialogTitle>
+              {dialogMode === 'create' ? (
+                <div className="flex items-center gap-2">
+                  <Button
+                    variant="ghost"
+                    size="icon"
+                    className="h-6 w-6"
+                    onClick={() => setDialogMode('select')}
+                  >
+                    <ArrowLeft className="h-4 w-4" />
+                  </Button>
+                  Create New Branch
+                </div>
+              ) : (
+                'Checkout Branch'
+              )}
+            </DialogTitle>
           </DialogHeader>
-          <div className="py-4">
-            <Label htmlFor="branch">Branch name</Label>
-            <Input
-              id="branch"
-              value={newBranch}
-              onChange={(e) => setNewBranch(e.target.value)}
-              className="mt-2 font-mono"
-              placeholder="main"
-            />
-          </div>
-          <DialogFooter>
-            <Button variant="ghost" onClick={() => setCheckoutDialogOpen(false)}>
-              Cancel
-            </Button>
-            <Button onClick={handleCheckout}>Checkout</Button>
-          </DialogFooter>
+
+          {dialogMode === 'select' ? (
+            branchesLoading ? (
+              <div className="flex items-center justify-center py-8">
+                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
+              </div>
+            ) : (
+              <Command className="border-t">
+                <CommandInput placeholder="Search branches..." />
+                <CommandList>
+                  <CommandEmpty>No branches found.</CommandEmpty>
+                  {branches && branches.local.length > 0 && (
+                    <CommandGroup heading="Local Branches">
+                      {branches.local
+                        .filter((b) => b !== worktree.branch)
+                        .map((branch) => {
+                          const inUse = usedBranches.includes(branch)
+                          return (
+                            <CommandItem
+                              key={`local-${branch}`}
+                              value={branch}
+                              disabled={inUse}
+                              onSelect={() => handleSelectBranch(branch)}
+                              className="font-mono text-sm"
+                            >
+                              <GitBranch className="mr-2 h-3.5 w-3.5" />
+                              {branch}
+                              {inUse && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  in use
+                                </span>
+                              )}
+                            </CommandItem>
+                          )
+                        })}
+                      {branches.local.includes(worktree.branch) && (
+                        <CommandItem
+                          key={`local-${worktree.branch}`}
+                          value={worktree.branch}
+                          disabled
+                          className="font-mono text-sm"
+                        >
+                          <Check className="mr-2 h-3.5 w-3.5 text-green-500" />
+                          {worktree.branch}
+                          <span className="ml-auto text-xs text-muted-foreground">current</span>
+                        </CommandItem>
+                      )}
+                    </CommandGroup>
+                  )}
+                  {branches && branches.remote.length > 0 && (
+                    <CommandGroup heading="Remote Branches">
+                      {branches.remote
+                        .filter((b) => !branches.local.includes(b) && b !== worktree.branch)
+                        .map((branch) => {
+                          const inUse = usedBranches.includes(branch)
+                          return (
+                            <CommandItem
+                              key={`remote-${branch}`}
+                              value={`remote/${branch}`}
+                              disabled={inUse}
+                              onSelect={() => handleSelectBranch(branch)}
+                              className="font-mono text-sm"
+                            >
+                              <GitBranch className="mr-2 h-3.5 w-3.5 text-muted-foreground" />
+                              {branch}
+                              {inUse && (
+                                <span className="ml-auto text-xs text-muted-foreground">
+                                  in use
+                                </span>
+                              )}
+                            </CommandItem>
+                          )
+                        })}
+                    </CommandGroup>
+                  )}
+                  <CommandSeparator />
+                  <CommandGroup>
+                    <CommandItem onSelect={() => setDialogMode('create')} className="text-sm">
+                      <Plus className="mr-2 h-3.5 w-3.5" />
+                      Create new branch
+                    </CommandItem>
+                  </CommandGroup>
+                </CommandList>
+              </Command>
+            )
+          ) : (
+            <>
+              <div className="px-4 py-4">
+                <Label htmlFor="new-branch-name">Branch name</Label>
+                <Input
+                  id="new-branch-name"
+                  value={newBranchName}
+                  onChange={(e) => setNewBranchName(e.target.value)}
+                  className="mt-2 font-mono"
+                  placeholder="feature/my-branch"
+                  autoFocus
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') handleCreateBranch()
+                  }}
+                />
+              </div>
+              <DialogFooter className="px-4 pb-4">
+                <Button variant="ghost" onClick={() => setDialogMode('select')}>
+                  Back
+                </Button>
+                <Button onClick={handleCreateBranch} disabled={!newBranchName.trim()}>
+                  Create & Checkout
+                </Button>
+              </DialogFooter>
+            </>
+          )}
         </DialogContent>
       </Dialog>
     </>
